@@ -4,14 +4,15 @@ namespace App\Entity;
 
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_USERNAME', fields: ['username'])]
+#[ORM\HasLifecycleCallbacks]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -29,19 +30,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 255, unique: true)]
-    private string $slug;
+    private ?string $slug = null;
 
     #[ORM\Column]
     private int $durationBetweenSlides = 10;
 
     #[ORM\OneToMany(targetEntity: Content::class, mappedBy: 'user', orphanRemoval: true)]
+    #[ORM\OrderBy(['displayOrder' => 'ASC'])]
     private Collection $content;
 
     public function __construct()
     {
         $this->roles = ['ROLE_USER'];
         $this->content = new ArrayCollection();
-        $this->slug = trim(strtolower(str_replace(' ', '-', $this->username)));
+    }
+
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function updateSlug(): void
+    {
+        if ($this->username) {
+            $this->slug = trim(strtolower(str_replace(' ', '-', $this->username)));
+        }
     }
 
     public function getId(): ?int
@@ -76,6 +86,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getRoles(): array
     {
         $roles = $this->roles;
+        // guarantee every user at least has ROLE_USER
         $roles[] = 'ROLE_USER';
 
         return array_unique($roles);
@@ -105,25 +116,59 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
-    
-    public function setSlug(string $slug): void
+
+    public function setSlug(string $slug): static
     {
         $this->slug = $slug;
+
+        return $this;
     }
 
-    public function getSlug(): string
+    public function getSlug(): ?string
     {
         return $this->slug;
     }
 
-    public function addContent(Content $content): void
+    public function getDurationBetweenSlides(): int
     {
-        $this->content->add($content);
+        return $this->durationBetweenSlides;
     }
 
-    public function getContents(): Collection
+    public function setDurationBetweenSlides(int $durationBetweenSlides): static
+    {
+        $this->durationBetweenSlides = $durationBetweenSlides;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Content>
+     */
+    public function getContent(): Collection
     {
         return $this->content;
+    }
+
+    public function addContent(Content $content): static
+    {
+        if (!$this->content->contains($content)) {
+            $this->content->add($content);
+            $content->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeContent(Content $content): static
+    {
+        if ($this->content->removeElement($content)) {
+            // set the owning side to null (unless already changed)
+            if ($content->getUser() === $this) {
+                $content->setUser(null);
+            }
+        }
+
+        return $this;
     }
 
     /**
@@ -132,7 +177,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function __serialize(): array
     {
         $data = (array)$this;
-        $data["\0" . self::class . "\0password"] = hash('crc32c', $this->password);
+        $data["\0" . self::class . "\0password"] = hash('crc32c', $this->password ?? '');
 
         return $data;
     }

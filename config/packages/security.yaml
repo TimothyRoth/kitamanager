@@ -23,6 +23,7 @@ security:
                 login_path: app_login
                 check_path: app_login
                 enable_csrf: true
+                success_handler: App\Security\LoginSuccessHandler
             logout:
                 path: app_logout
                 # where to redirect after logout
@@ -36,8 +37,8 @@ security:
 
     # Note: Only the *first* matching rule is applied
     access_control:
-        # - { path: ^/admin, roles: ROLE_ADMIN }
-        - { path: ^/management, roles: ROLE_USER }
+        - { path: ^/management/user, roles: ROLE_USER }
+        - { path: ^/management/admin, roles: ROLE_ADMIN }
 
 when@test:
     security:

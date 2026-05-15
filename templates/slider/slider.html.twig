@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Slider für {{ user.username }}{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="surface">
+            <h1>Slider für {{ user.username }}</h1>
+            <p><strong>Dauer zwischen den Slides:</strong> {{ user.durationBetweenSlides }} Sekunden</p>
+        </div>
+
+        <hr>
+
+        <h2>Alle Inhalte:</h2>
+
+        {% for content in contents %}
+            <div class="surface">
+                <h3>Typ: {{ content.type.getGermanLabel() }}</h3>
+
+                {% if content.type.value == 'article' %}
+                    <h4>{{ content.title }}</h4>
+                    <div style="margin-bottom: var(--spacing-sm);">
+                        {{ content.content|raw }}
+                    </div>
+                {% endif %}
+
+                {% if content.type.value == 'image' %}
+                    <img src="{{ asset(content.imageUrl) }}" alt="Inhaltsbild"
+                         style="max-height: 400px; object-fit: contain; border-radius: var(--border-radius); margin-top: var(--spacing-sm);">
+                {% endif %}
+
+                <div style="font-size: 0.875rem; color: var(--color-text-muted); margin-top: var(--spacing-sm);">
+                    Erstellt am: {{ content.createdAt|date('d.m.Y H:i') }}
+                    {% if not content.user %}
+                        <span style="margin-left: 10px; color: var(--color-primary); font-weight: bold;">(Globaler Inhalt)</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-danger">
+                Für diesen Benutzer wurden keine Inhalte gefunden.
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

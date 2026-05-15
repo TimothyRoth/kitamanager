@@ -1,0 +1,156 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="flex-between">
+            <h1>Willkommen, {{ app.user.username }}!</h1>
+            <a href="{{ logout_path() }}" class="btn btn-link">Abmelden</a>
+        </div>
+
+        {% for label, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="alert alert-{{ label }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endfor %}
+
+        <div class="surface" style="margin-top: var(--spacing-xl);">
+            <h2>Kitas verwalten</h2>
+            <h3>Neue Kita hinzufügen</h3>
+            {{ form_start(form, {'attr': {'data-turbo-scroll': 'false'}}) }}
+            <div class="form-group">
+                {{ form_row(form.username, {'label': 'Benutzername'}) }}
+            </div>
+            <div class="form-group">
+                {{ form_row(form.plainPassword, {'label': 'Passwort'}) }}
+            </div>
+            <button type="submit" class="btn btn-primary">Kita hinzufügen</button>
+            {{ form_end(form) }}
+        </div>
+
+        <div class="data-list">
+            <div class="data-row data-header">
+                <div class="data-cell">Name</div>
+                <div class="data-cell cell-actions">Aktionen</div>
+            </div>
+
+            {% for user in users %}
+                <div class="data-row">
+                    <div class="data-cell">
+                        <span class="data-cell-label">Name</span>
+                        <a href="{{ path('app_slider', {'slug': user.slug}) }}">{{ user.username }}</a>
+                    </div>
+                    <div class="data-cell cell-actions">
+                        <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-link">Bearbeiten</a>
+                        <form class="form-inline" method="post"
+                              action="{{ path('app_management_delete_user', {'id': user.id}) }}"
+                              data-confirm="Soll diese Kita mitsamt all ihrer Beiträge endgültig gelöscht werden?"
+                              data-turbo-scroll="false">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
+                            <button type="submit" class="btn-link text-danger">Löschen</button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="data-empty">Keine Kitas gefunden.</div>
+            {% endfor %}
+        </div>
+
+        <div class="flex-between" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+            <h2>Zentrale Inhalte verwalten</h2>
+            <div class="actions-bar" style="margin-bottom: 0;">
+                <a href="{{ path('app_management_create_global_content', {'is_article': 0}) }}" class="btn btn-primary">Bild
+                    hinzufügen</a>
+                <a href="{{ path('app_management_create_global_content', {'is_article': 1}) }}" class="btn btn-primary">Artikel
+                    hinzufügen</a>
+            </div>
+        </div>
+
+        <div class="data-list">
+            <div class="data-row data-header">
+                {% if globalContents|length > 1 %}
+                    <div class="data-cell" style="flex: 0 0 100px;">Reihenfolge</div>
+                {% endif %}
+                <div class="data-cell">Typ</div>
+                <div class="data-cell" style="flex: 2;">Titel/Bild</div>
+                <div class="data-cell">Status</div>
+                <div class="data-cell cell-actions">Aktionen</div>
+            </div>
+
+            {% for content in globalContents %}
+                <div class="data-row {{ not content.isEnabled ? 'is-disabled' : '' }}">
+                    {% if globalContents|length > 1 %}
+                        <div class="data-cell" style="flex: 0 0 100px;">
+                            <span class="data-cell-label">Reihenfolge</span>
+                            <div class="table-actions">
+                                {% if not loop.first %}
+                                    <form class="form-inline" method="post"
+                                          action="{{ path('app_management_content_move_up', {'id': content.id}) }}"
+                                          data-turbo-scroll="false">
+                                        <input type="hidden" name="_token"
+                                               value="{{ csrf_token('move-up' ~ content.id) }}">
+                                        <button type="submit" class="btn-icon" title="Nach oben">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z"/></svg>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if not loop.last %}
+                                    <form class="form-inline" method="post"
+                                          action="{{ path('app_management_content_move_down', {'id': content.id}) }}"
+                                          data-turbo-scroll="false">
+                                        <input type="hidden" name="_token"
+                                               value="{{ csrf_token('move-down' ~ content.id) }}">
+                                        <button type="submit" class="btn-icon" title="Nach unten">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20l8-8h-6v-8h-4v8h-6z"/></svg>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="data-cell">
+                        <span class="data-cell-label">Typ</span>
+                        {{ content.type.getGermanLabel() }}
+                    </div>
+                    <div class="data-cell" style="flex: 2;">
+                        <span class="data-cell-label">Titel/Bild</span>
+                        {% if content.type.value == 'article' %}
+                            {{ content.title }}
+                        {% else %}
+                            <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
+                        {% endif %}
+                    </div>
+                    <div class="data-cell">
+                        <span class="data-cell-label">Status</span>
+                        <form class="form-inline" method="post"
+                              action="{{ path('app_management_content_toggle_status', {'id': content.id}) }}"
+                              data-turbo-scroll="false">
+                            <input type="hidden" name="_token"
+                                   value="{{ csrf_token('toggle-status' ~ content.id) }}">
+                            <button type="submit"
+                                    class="btn-link status-indicator {{ content.isEnabled ? 'status-enabled' : 'status-disabled' }}">
+                                {{ content.isEnabled ? 'Aktiv' : 'Inaktiv' }}
+                            </button>
+                        </form>
+                    </div>
+                    <div class="data-cell cell-actions">
+                        <a href="{{ path('app_management_edit_content', {'id': content.id}) }}"
+                           class="btn btn-link">Bearbeiten</a>
+                        <form class="form-inline" method="post"
+                              action="{{ path('app_management_delete_content', {'id': content.id}) }}"
+                              data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten?"
+                              data-turbo-scroll="false">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
+                            <button type="submit" class="btn-link text-danger">Löschen</button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="data-empty">Keine globalen Inhalte gefunden.</div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

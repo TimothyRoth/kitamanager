@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Bearbeiten{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="surface">
+            <h1>In Bearbeitung: {{ user.username }}</h1>
+
+            {{ form_start(form) }}
+            <div class="form-group">
+                {{ form_row(form.username) }}
+            </div>
+            <div class="form-group">
+                {{ form_row(form.plainPassword, {'required': false, 'label': 'Neues Passwort (nur nötig bei Änderung)'}) }}
+            </div>
+            <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+            {{ form_end(form) }}
+
+            <div style="margin-top: var(--spacing-md);">
+                <a href="{{ path('app_management_admin') }}" class="btn btn-link">Zurück zum Dashboard</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

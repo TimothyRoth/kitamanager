@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="surface">
+            <h1>{{ page_title }}</h1>
+
+            {% if content.imageUrl %}
+                <div style="margin-bottom: var(--spacing-md);">
+                    <p><strong>Aktuelles Bild:</strong></p>
+                    <img src="{{ asset(content.imageUrl) }}" alt="{{ content.title }}" class="current-image-preview">
+                </div>
+            {% endif %}
+
+            {{ form_start(form) }}
+            <div class="form-group">
+                {{ form_widget(form) }}
+            </div>
+            <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+            {{ form_end(form) }}
+
+            <div style="margin-top: var(--spacing-md);">
+                <a href="{{ path(app.user ? 'app_management_user' : 'app_management_admin') }}" class="btn btn-link">Zurück
+                    zum Dashboard</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
