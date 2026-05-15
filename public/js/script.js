@@ -8,4 +8,104 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Initialize WYSIWYG Editor
+    const initWysiwyg = () => {
+        const textareas = document.querySelectorAll('.wysiwyg');
+
+        textareas.forEach(textarea => {
+            if (textarea.dataset.editorInitialized === "true") return;
+            textarea.dataset.editorInitialized = "true";
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'wysiwyg-wrapper';
+            textarea.parentNode.insertBefore(wrapper, textarea);
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'wysiwyg-toolbar';
+
+            const buttons = [
+                {command: 'formatBlock', value: 'H2', label: 'H2', icon: 'H2'},
+                {command: 'formatBlock', value: 'H3', label: 'H3', icon: 'H3'},
+                {command: 'bold', label: 'Fett', icon: '<strong>B</strong>'},
+                {command: 'italic', label: 'Kursiv', icon: '<em>I</em>'},
+                {command: 'insertUnorderedList', label: 'Liste (Punkte)', icon: '• Liste'},
+                {command: 'insertOrderedList', label: 'Liste (Zahlen)', icon: '1. Liste'}
+            ];
+
+            buttons.forEach(btn => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'wysiwyg-btn';
+                button.innerHTML = btn.icon;
+                button.title = btn.label;
+
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    let value = btn.value || null;
+                    document.execCommand(btn.command, false, value);
+                    editor.focus();
+                    updateTextarea();
+                });
+                toolbar.appendChild(button);
+            });
+
+            const editor = document.createElement('div');
+            editor.className = 'wysiwyg-editor form-control';
+            editor.contentEditable = true;
+            editor.innerHTML = textarea.value;
+
+            wrapper.appendChild(toolbar);
+            wrapper.appendChild(editor);
+            wrapper.appendChild(textarea);
+
+            textarea.style.display = 'none';
+
+            const updateTextarea = () => {
+                textarea.value = editor.innerHTML;
+            };
+
+            editor.addEventListener('input', updateTextarea);
+            editor.addEventListener('blur', updateTextarea);
+            editor.addEventListener('keyup', updateTextarea);
+        });
+    };
+
+    // Initialize TV Slider logic
+    const initTvSlider = () => {
+        const sliderContainer = document.getElementById('tv-slider');
+        if (!sliderContainer) return;
+
+        // Prevent multiple intervals if Turbo re-renders
+        if (window.tvSliderInterval) {
+            clearInterval(window.tvSliderInterval);
+        }
+
+        const slides = sliderContainer.querySelectorAll('.tv-slide');
+        if (slides.length <= 1) return; // No need to slide if 0 or 1 item
+
+        const durationMs = parseInt(sliderContainer.getAttribute('data-duration'), 10) || 10000;
+        let currentIndex = 0;
+
+        window.tvSliderInterval = setInterval(() => {
+            // Remove active class from current
+            slides[currentIndex].classList.remove('is-active');
+
+            // Move to next index, looping back to 0
+            currentIndex = (currentIndex + 1) % slides.length;
+
+            // Add active class to new current
+            slides[currentIndex].classList.add('is-active');
+        }, durationMs);
+    };
+
+    // Run initializations
+    initWysiwyg();
+    initTvSlider();
+
+    // Re-initialize on Turbo render if applicable
+    document.addEventListener('turbo:render', () => {
+        initWysiwyg();
+        initTvSlider();
+    });
 });

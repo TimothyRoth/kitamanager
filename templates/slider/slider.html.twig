@@ -1,44 +1,35 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Slider für {{ user.username }}{% endblock %}
+{% block title %}Slider{% endblock %}
 
 {% block body %}
-    <div class="container">
-        <div class="surface">
-            <h1>Slider für {{ user.username }}</h1>
-            <p><strong>Dauer zwischen den Slides:</strong> {{ user.durationBetweenSlides }} Sekunden</p>
-        </div>
-
-        <hr>
-
-        <h2>Alle Inhalte:</h2>
+    <div class="tv-slider-viewport"
+         data-duration="{{ user.durationBetweenSlides * 1000 }}"
+         id="tv-slider">
 
         {% for content in contents %}
-            <div class="surface">
-                <h3>Typ: {{ content.type.getGermanLabel() }}</h3>
-
-                {% if content.type.value == 'article' %}
-                    <h4>{{ content.title }}</h4>
-                    <div style="margin-bottom: var(--spacing-sm);">
-                        {{ content.content|raw }}
-                    </div>
-                {% endif %}
-
-                {% if content.type.value == 'image' %}
-                    <img src="{{ asset(content.imageUrl) }}" alt="Inhaltsbild"
-                         style="max-height: 400px; object-fit: contain; border-radius: var(--border-radius); margin-top: var(--spacing-sm);">
-                {% endif %}
-
-                <div style="font-size: 0.875rem; color: var(--color-text-muted); margin-top: var(--spacing-sm);">
-                    Erstellt am: {{ content.createdAt|date('d.m.Y H:i') }}
-                    {% if not content.user %}
-                        <span style="margin-left: 10px; color: var(--color-primary); font-weight: bold;">(Globaler Inhalt)</span>
-                    {% endif %}
+            {% if content.type.value == 'image' %}
+                <div class="tv-slide tv-slide-image {% if loop.first %}is-active{% endif %}">
+                    <img src="{{ asset(content.imageUrl) }}" alt="Slider Image">
                 </div>
-            </div>
+            {% elseif content.type.value == 'article' %}
+                <div class="tv-slide tv-slide-article {% if loop.first %}is-active{% endif %}">
+                    <div class="tv-article-media">
+                        {% if content.imageUrl %}
+                            <img src="{{ asset(content.imageUrl) }}" alt="Article Image">
+                        {% endif %}
+                    </div>
+                    <div class="tv-article-content">
+                        <div class="tv-article-title">{{ content.title }}</div>
+                        <div class="tv-article-body">
+                            {{ content.content|raw }}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
         {% else %}
-            <div class="alert alert-danger">
-                Für diesen Benutzer wurden keine Inhalte gefunden.
+            <div class="tv-empty-state">
+                Keine aktiven Inhalte verfügbar.
             </div>
         {% endfor %}
     </div>

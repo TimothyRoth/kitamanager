@@ -41,6 +41,45 @@ select:focus {
     resize: vertical;
 }
 
+/* Custom WYSIWYG Editor */
+.wysiwyg-wrapper {
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.wysiwyg-toolbar {
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-xs);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.wysiwyg-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--color-text);
+    transition: background-color 0.15s;
+}
+
+.wysiwyg-btn:hover {
+    background-color: var(--color-border);
+}
+
+.wysiwyg-editor {
+    min-height: 250px;
+    padding: var(--spacing-sm);
+    background-color: var(--color-surface);
+    outline: none;
+    overflow-y: auto;
+}
+
 /* Buttons */
 .btn,
 button {
@@ -61,14 +100,14 @@ button {
 }
 
 .btn-primary,
-button[type="submit"]:not(.btn-link):not(.btn-icon) {
+button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn) {
     color: #fff;
     background-color: var(--color-primary);
     border-color: var(--color-primary);
 }
 
 .btn-primary:hover,
-button[type="submit"]:not(.btn-link):not(.btn-icon):hover {
+button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):hover {
     background-color: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
 }

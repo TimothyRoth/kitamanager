@@ -1,27 +1,131 @@
-.slider-preview-item {
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-    background-color: var(--color-surface);
+/* TV Slider Fullscreen Kiosk Layout */
+.tv-slider-viewport {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    z-index: 9999;
+    overflow: hidden;
+    color: #fff;
+    /* Reset any inherited fonts to ensure clean display on TV */
+    font-family: system-ui, -apple-system, sans-serif;
 }
 
-.slider-preview-item img {
-    border-radius: var(--border-radius);
-    margin-top: var(--spacing-sm);
-    max-height: 400px;
-    object-fit: contain;
+.tv-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 1s ease-in-out, visibility 1s;
+    display: flex;
 }
 
-.slider-preview-meta {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    margin-top: var(--spacing-sm);
+.tv-slide.is-active {
+    opacity: 1;
+    visibility: visible;
 }
 
-.current-image-preview {
-    max-width: 200px;
-    border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-md);
-    display: block;
+/* Image Only Slide */
+.tv-slide-image {
+    justify-content: center;
+    align-items: center;
+}
+
+.tv-slide-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Ensures the whole flyer/image is visible without cropping */
+}
+
+/* Article Split View Slide */
+.tv-slide-article {
+    flex-direction: row;
+    background-color: #111;
+}
+
+.tv-article-media {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4vw; /* Using viewport width for dynamic scaling */
+    height: 100vh; /* Force container to full viewport height */
+}
+
+.tv-article-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Ensures the image grows as large as possible within the flex item while maintaining aspect ratio */
+    border-radius: 1vw;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.tv-article-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6vw; /* Using viewport width for dynamic scaling */
+    background-color: #1a1a1a;
+    height: 100vh; /* Force content area to full height to prevent uneven backgrounds */
+    overflow: hidden; /* Prevent text from overflowing if too long */
+}
+
+/*
+ * Typography Scaling for 4K displays.
+ * Using 'vh' (viewport height) or 'vw' (viewport width) instead of 'rem'
+ * ensures the text scales perfectly relative to the massive screen size,
+ * rather than relying on a base font size which might not be large enough on 4K.
+ */
+.tv-article-title {
+    font-size: 5vh;
+    font-weight: 700;
+    margin-bottom: 3vh;
+    line-height: 1.1;
+    color: #fff;
+}
+
+.tv-article-body {
+    font-size: 3vh;
+    line-height: 1.6;
+    color: #cbd5e1; /* Light slate color for good readability on dark bg */
+}
+
+.tv-article-body h2 {
+    font-size: 4vh;
+    color: #fff;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.tv-article-body h3 {
+    font-size: 3.5vh;
+    color: #fff;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.tv-article-body p,
+.tv-article-body ul,
+.tv-article-body ol {
+    margin-bottom: 1em;
+}
+
+.tv-article-body li {
+    margin-bottom: 0.5em;
+}
+
+.tv-empty-state {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    font-size: 4vh;
+    color: #64748b;
 }
