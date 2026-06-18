@@ -291,3 +291,38 @@ button.btn-link:hover {
     height: auto;
     border-radius: 4px;
 }
+
+/* Multi-image upload preview */
+.image-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.image-preview-grid img {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+/* Bulk-select checkbox cell */
+.cell-checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.cell-checkbox input[type="checkbox"] {
+    width: auto;
+    display: inline-block;
+    margin: 0;
+}
+
+@media (min-width: 768px) {
+    .cell-checkbox {
+        justify-content: center;
+    }
+}

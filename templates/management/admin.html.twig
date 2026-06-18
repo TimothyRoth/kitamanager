@@ -18,8 +18,8 @@
         {% endfor %}
 
         <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Kitas verwalten</h2>
-            <h3>Neue Kita hinzufügen</h3>
+            <h2>Benutzer verwalten</h2>
+            <h3>Neuen Benutzer hinzufügen</h3>
             {{ form_start(form, {'attr': {'data-turbo-scroll': 'false'}}) }}
             <div class="form-group">
                 {{ form_row(form.username, {'label': 'Benutzername'}) }}
@@ -27,7 +27,7 @@
             <div class="form-group">
                 {{ form_row(form.plainPassword, {'label': 'Passwort'}) }}
             </div>
-            <button type="submit" class="btn btn-primary">Kita hinzufügen</button>
+            <button type="submit" class="btn btn-primary">Benutzer hinzufügen</button>
             {{ form_end(form) }}
         </div>
 
@@ -47,7 +47,7 @@
                         <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-link">Bearbeiten</a>
                         <form class="form-inline" method="post"
                               action="{{ path('app_management_delete_user', {'id': user.id}) }}"
-                              data-confirm="Soll diese Kita mitsamt all ihrer Beiträge endgültig gelöscht werden?"
+                              data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?"
                               data-turbo-scroll="false">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
                             <button type="submit" class="btn-link text-danger">Löschen</button>
@@ -55,7 +55,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="data-empty">Keine Kitas gefunden.</div>
+                <div class="data-empty">Keine Benutzer gefunden.</div>
             {% endfor %}
         </div>
 
@@ -66,11 +66,22 @@
                     hinzufügen</a>
                 <a href="{{ path('app_management_create_global_content', {'is_article': 1}) }}" class="btn btn-primary">Artikel
                     hinzufügen</a>
+                <form id="bulkDeleteForm" method="post"
+                      action="{{ path('app_management_bulk_delete_content') }}"
+                      data-confirm="Ausgewählte Inhalte wirklich löschen?"
+                      data-turbo-scroll="false">
+                    <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
+                    <input type="hidden" name="_redirect" value="app_management_admin">
+                    <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
+                </form>
             </div>
         </div>
 
         <div class="data-list">
             <div class="data-row data-header">
+                <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                    <input type="checkbox" data-bulk-select-all title="Alle auswählen">
+                </div>
                 {% if globalContents|length > 1 %}
                     <div class="data-cell" style="flex: 0 0 100px;">Reihenfolge</div>
                 {% endif %}
@@ -82,6 +93,11 @@
 
             {% for content in globalContents %}
                 <div class="data-row {{ not content.isEnabled ? 'is-disabled' : '' }}">
+                    <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                        <span class="data-cell-label">Auswählen</span>
+                        <input type="checkbox" class="bulk-checkbox" name="ids[]"
+                               value="{{ content.id }}" form="bulkDeleteForm">
+                    </div>
                     {% if globalContents|length > 1 %}
                         <div class="data-cell" style="flex: 0 0 100px;">
                             <span class="data-cell-label">Reihenfolge</span>

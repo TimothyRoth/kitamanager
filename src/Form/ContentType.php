@@ -9,6 +9,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\All;
 use Symfony\Component\Validator\Constraints\Image;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
@@ -16,23 +17,35 @@ class ContentType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('imageFile', FileType::class, [
-                'label' => 'Bild hochladen',
-                'mapped' => false,
-                'required' => $options['is_new'],
-                'constraints' => [
-                    new Image([
-                        'maxSize' => '5M',
-                        'mimeTypes' => [
-                            'image/jpeg',
-                            'image/png',
-                            'image/gif',
-                        ],
-                        'mimeTypesMessage' => 'Bitte laden Sie ein gültiges Bild hoch (JPEG, PNG, GIF).',
-                    ]),
-                ],
-            ]);
+        $imageConstraint = new Image([
+            'maxSize' => '10M',
+            'maxSizeMessage' => 'Die Datei ist zu groß ({{ size }} {{ suffix }}). Erlaubt sind maximal {{ limit }} {{ suffix }}.',
+            'mimeTypes' => [
+                'image/jpeg',
+                'image/png',
+                'image/gif',
+            ],
+            'mimeTypesMessage' => 'Bitte laden Sie ein gültiges Bild hoch (JPEG, PNG, GIF).',
+        ]);
+
+        $imageOptions = [
+            'label' => $options['multiple'] ? 'Bilder hochladen' : 'Bild hochladen',
+            'mapped' => false,
+            'multiple' => $options['multiple'],
+            'required' => $options['is_new'],
+            'constraints' => $options['multiple']
+                ? [new All(['constraints' => [$imageConstraint]])]
+                : [$imageConstraint],
+        ];
+
+        if ($options['multiple']) {
+            $imageOptions['attr'] = [
+                'accept' => 'image/*',
+                'class' => 'image-multi-upload',
+            ];
+        }
+
+        $builder->add('imageFile', FileType::class, $imageOptions);
 
         if ($options['is_article']) {
             $builder
@@ -54,6 +67,7 @@ class ContentType extends AbstractType
             'data_class' => Content::class,
             'is_article' => false,
             'is_new' => true,
+            'multiple' => false,
         ]);
     }
 }

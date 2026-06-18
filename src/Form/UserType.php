@@ -14,7 +14,7 @@ class UserType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->add('username', options: ['label' => 'Kita Name']);
+        $builder->add('username', options: ['label' => 'Benutzername']);
 
         $passwordConstraints = [
             new Length([

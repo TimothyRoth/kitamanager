@@ -27,19 +27,43 @@
             {{ form_end(durationForm) }}
         </div>
 
+        <div class="surface" style="margin-top: var(--spacing-xl);">
+            <h2>Passwort ändern</h2>
+            {{ form_start(passwordForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
+            <div class="form-group">
+                {{ form_row(passwordForm.currentPassword) }}
+            </div>
+            <div class="form-group">
+                {{ form_row(passwordForm.newPassword) }}
+            </div>
+            <button type="submit" class="btn btn-primary">Passwort speichern</button>
+            {{ form_end(passwordForm) }}
+        </div>
+
         <div class="flex-between" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
             <div class="header-actions">
                 <h2 style="margin-bottom: 0;">Slider verwalten</h2>
                 <span>(<a href="{{ path('app_slider') }}" class="btn-link">zum Slider</a>)</span>
             </div>
             <div class="actions-bar" style="margin-bottom: 0;">
-                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bild hinzufügen</a>
+                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder hinzufügen</a>
                 <a href="{{ path('app_management_create_article') }}" class="btn btn-primary">Artikel hinzufügen</a>
+                <form id="bulkDeleteForm" method="post"
+                      action="{{ path('app_management_bulk_delete_content') }}"
+                      data-confirm="Ausgewählte Inhalte wirklich löschen?"
+                      data-turbo-scroll="false">
+                    <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
+                    <input type="hidden" name="_redirect" value="app_management_user">
+                    <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
+                </form>
             </div>
         </div>
 
         <div class="data-list">
             <div class="data-row data-header">
+                <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                    <input type="checkbox" data-bulk-select-all title="Alle auswählen">
+                </div>
                 {% if contents|length > 1 %}
                     <div class="data-cell" style="flex: 0 0 100px;">Reihenfolge</div>
                 {% endif %}
@@ -51,6 +75,11 @@
 
             {% for content in contents %}
                 <div class="data-row {{ not content.isEnabled ? 'is-disabled' : '' }}">
+                    <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                        <span class="data-cell-label">Auswählen</span>
+                        <input type="checkbox" class="bulk-checkbox" name="ids[]"
+                               value="{{ content.id }}" form="bulkDeleteForm">
+                    </div>
                     {% if contents|length > 1 %}
                         <div class="data-cell" style="flex: 0 0 100px;">
                             <span class="data-cell-label">Reihenfolge</span>

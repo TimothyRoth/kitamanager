@@ -3,7 +3,9 @@ framework:
     secret: '%env(APP_SECRET)%'
 
     # Note that the session will be started ONLY if you read or write from it.
-    session: true
+    session:
+        gc_maxlifetime: 1800   # 30 min idle window (sliding; resets on activity)
+        cookie_lifetime: 0     # cookie persists until the browser is closed
 
     #esi: true
     #fragments: true

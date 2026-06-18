@@ -99,13 +99,78 @@ document.addEventListener('DOMContentLoaded', () => {
         }, durationMs);
     };
 
+    // Initialize bulk-delete selection
+    const initBulkDelete = () => {
+        const submitButton = document.querySelector('[data-bulk-submit]');
+        if (!submitButton) return;
+
+        const checkboxes = Array.from(document.querySelectorAll('.bulk-checkbox'));
+        const selectAll = document.querySelector('[data-bulk-select-all]');
+
+        const refresh = () => {
+            const anyChecked = checkboxes.some(cb => cb.checked);
+            submitButton.disabled = !anyChecked;
+
+            if (selectAll) {
+                const allChecked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = anyChecked && !allChecked;
+            }
+        };
+
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                checkboxes.forEach(cb => {
+                    cb.checked = selectAll.checked;
+                });
+                refresh();
+            });
+        }
+
+        checkboxes.forEach(cb => cb.addEventListener('change', refresh));
+        refresh();
+    };
+
+    // Initialize multi-image upload preview
+    const initImagePreview = () => {
+        const inputs = document.querySelectorAll('.image-multi-upload');
+
+        inputs.forEach(input => {
+            if (input.dataset.previewInitialized === "true") return;
+            input.dataset.previewInitialized = "true";
+
+            const preview = document.createElement('div');
+            preview.className = 'image-preview-grid';
+            input.parentNode.insertBefore(preview, input.nextSibling);
+
+            input.addEventListener('change', () => {
+                // Release any previously created object URLs to avoid leaks.
+                preview.querySelectorAll('img').forEach(img => URL.revokeObjectURL(img.src));
+                preview.innerHTML = '';
+
+                Array.from(input.files).forEach(file => {
+                    if (!file.type.startsWith('image/')) return;
+
+                    const img = document.createElement('img');
+                    img.className = 'thumbnail';
+                    img.src = URL.createObjectURL(file);
+                    preview.appendChild(img);
+                });
+            });
+        });
+    };
+
     // Run initializations
     initWysiwyg();
     initTvSlider();
+    initBulkDelete();
+    initImagePreview();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
         initWysiwyg();
         initTvSlider();
+        initBulkDelete();
+        initImagePreview();
     });
 });
