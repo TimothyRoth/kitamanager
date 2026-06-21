@@ -160,11 +160,207 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const syncWysiwygFields = (form) => {
+        form.querySelectorAll('.wysiwyg').forEach(textarea => {
+            const editor = textarea.closest('.wysiwyg-wrapper')?.querySelector('.wysiwyg-editor');
+            if (editor) {
+                textarea.value = editor.innerHTML;
+            }
+        });
+    };
+
+    const formHasSelectedFiles = (form) => {
+        return Array.from(form.querySelectorAll('input[type="file"]'))
+            .some(input => input.files && input.files.length > 0);
+    };
+
+    const createUploadProgressUi = (form) => {
+        const existing = form.querySelector('.upload-progress');
+        if (existing) {
+            return {
+                root: existing,
+                bar: existing.querySelector('.upload-progress-bar'),
+                label: existing.querySelector('.upload-progress-label'),
+                percent: existing.querySelector('.upload-progress-percent'),
+            };
+        }
+
+        const root = document.createElement('div');
+        root.className = 'upload-progress is-hidden';
+        root.setAttribute('role', 'status');
+        root.setAttribute('aria-live', 'polite');
+        root.innerHTML = `
+            <p class="upload-progress-label">Wird hochgeladen…</p>
+            <div class="upload-progress-track">
+                <div class="upload-progress-bar"></div>
+            </div>
+            <p class="upload-progress-percent">0%</p>
+        `;
+
+        const submitButton = form.querySelector('[type="submit"]');
+        if (submitButton) {
+            submitButton.insertAdjacentElement('afterend', root);
+        } else {
+            form.appendChild(root);
+        }
+
+        return {
+            root,
+            bar: root.querySelector('.upload-progress-bar'),
+            label: root.querySelector('.upload-progress-label'),
+            percent: root.querySelector('.upload-progress-percent'),
+        };
+    };
+
+    const showUploadProgressError = (form, message) => {
+        form.querySelector('.upload-progress-error')?.remove();
+
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-danger upload-progress-error';
+        alert.textContent = message;
+
+        const progress = form.querySelector('.upload-progress');
+        if (progress) {
+            progress.insertAdjacentElement('afterend', alert);
+        } else {
+            form.appendChild(alert);
+        }
+    };
+
+    const initUploadProgress = () => {
+        document.querySelectorAll('form[data-upload-with-progress]').forEach(form => {
+            if (form.dataset.uploadProgressInitialized === 'true') {
+                return;
+            }
+            form.dataset.uploadProgressInitialized = 'true';
+
+            const ui = createUploadProgressUi(form);
+
+            const resetUi = () => {
+                ui.root.classList.add('is-hidden');
+                ui.bar.classList.remove('is-indeterminate');
+                ui.bar.style.width = '0%';
+                ui.percent.textContent = '0%';
+                ui.label.textContent = 'Wird hochgeladen…';
+                form.querySelector('.upload-progress-error')?.remove();
+            };
+
+            const showUi = () => {
+                ui.root.classList.remove('is-hidden');
+                form.querySelector('.upload-progress-error')?.remove();
+            };
+
+            form.addEventListener('submit', (event) => {
+                if (!formHasSelectedFiles(form)) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                syncWysiwygFields(form);
+
+                const submitButton = form.querySelector('[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                }
+
+                showUi();
+                ui.label.textContent = 'Dateien werden hochgeladen…';
+
+                const formData = new FormData(form);
+                const xhr = new XMLHttpRequest();
+                xhr.open(form.method || 'POST', form.action);
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (!e.lengthComputable) {
+                        ui.bar.classList.add('is-indeterminate');
+                        ui.percent.textContent = 'Upload läuft…';
+                        return;
+                    }
+
+                    ui.bar.classList.remove('is-indeterminate');
+                    const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+                    ui.bar.style.width = percent + '%';
+                    ui.percent.textContent = percent + '%';
+
+                    if (percent >= 100) {
+                        ui.label.textContent = 'Wird auf dem Server verarbeitet…';
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    resetUi();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+
+                    if (xhr.status === 413) {
+                        showUploadProgressError(
+                            form,
+                            'Der Upload war zu groß. Bitte kleinere Dateien wählen (max. 10 MB pro Bild).'
+                        );
+                        return;
+                    }
+
+                    if (xhr.status === 0) {
+                        showUploadProgressError(
+                            form,
+                            'Verbindung unterbrochen. Bitte erneut versuchen.'
+                        );
+                        return;
+                    }
+
+                    if (xhr.status >= 500) {
+                        showUploadProgressError(
+                            form,
+                            'Serverfehler beim Hochladen. Bitte später erneut versuchen.'
+                        );
+                        return;
+                    }
+
+                    const responsePath = new URL(xhr.responseURL).pathname;
+                    const formPath = new URL(form.action, window.location.origin).pathname;
+
+                    if (responsePath !== formPath) {
+                        window.location.href = xhr.responseURL;
+                        return;
+                    }
+
+                    // Validation errors or flash on the same page — replace document.
+                    document.open();
+                    document.write(xhr.responseText);
+                    document.close();
+                });
+
+                xhr.addEventListener('error', () => {
+                    resetUi();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                    showUploadProgressError(
+                        form,
+                        'Upload fehlgeschlagen. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.'
+                    );
+                });
+
+                xhr.addEventListener('abort', () => {
+                    resetUi();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                });
+
+                xhr.send(formData);
+            });
+        });
+    };
+
     // Run initializations
     initWysiwyg();
     initTvSlider();
     initBulkDelete();
     initImagePreview();
+    initUploadProgress();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
@@ -172,5 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initTvSlider();
         initBulkDelete();
         initImagePreview();
+        initUploadProgress();
     });
 });

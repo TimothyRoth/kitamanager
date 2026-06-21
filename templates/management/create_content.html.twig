@@ -15,7 +15,7 @@
         <div class="surface">
             <h1>{{ page_title }}</h1>
 
-            {{ form_start(form) }}
+            {{ form_start(form, {'attr': {'data-upload-with-progress': '', 'data-turbo': 'false'}}) }}
             <div class="form-group">
                 {{ form_widget(form) }}
             </div>
