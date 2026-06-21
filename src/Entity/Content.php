@@ -66,9 +66,27 @@ class Content
             $qb->where('c.user IS NULL');
         }
 
-        $highestOrder = $qb->getQuery()->getSingleScalarResult();
+        $highestOrder = (int) ($qb->getQuery()->getSingleScalarResult() ?? 0);
 
-        $this->displayOrder = ($highestOrder ?? 0) + 1;
+        // During a bulk insert (e.g. multi-image upload) none of the sibling rows are
+        // flushed yet, so the MAX query above would return the same value for all of them.
+        // Count the siblings already scheduled in this UnitOfWork within the same scope
+        // (same owning user, or all global) so each gets a unique, incrementing order.
+        $pendingSiblings = 0;
+        foreach ($entityManager->getUnitOfWork()->getScheduledEntityInsertions() as $scheduled) {
+            if ($scheduled === $this || !$scheduled instanceof self) {
+                continue;
+            }
+
+            $scheduledUserId = $scheduled->getUser()?->getId();
+            $thisUserId = $this->getUser()?->getId();
+
+            if ($scheduledUserId === $thisUserId) {
+                $pendingSiblings++;
+            }
+        }
+
+        $this->displayOrder = $highestOrder + $pendingSiblings + 1;
     }
 
     #[ORM\PreUpdate]
