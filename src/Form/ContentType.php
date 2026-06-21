@@ -26,6 +26,13 @@ class ContentType extends AbstractType
                 'image/gif',
             ],
             'mimeTypesMessage' => 'Bitte laden Sie ein gültiges Bild hoch (JPEG, PNG, GIF).',
+            // Messages for PHP-level upload errors (e.g. a single file exceeding upload_max_filesize).
+            'uploadIniSizeErrorMessage' => 'Die Datei ist zu groß. Erlaubt sind maximal {{ limit }} {{ suffix }}.',
+            'uploadFormSizeErrorMessage' => 'Die Datei ist zu groß und konnte nicht hochgeladen werden.',
+            'uploadPartialErrorMessage' => 'Die Datei wurde nur teilweise hochgeladen. Bitte versuchen Sie es erneut.',
+            'uploadNoTmpDirErrorMessage' => 'Hochladen nicht möglich: Auf dem Server fehlt ein temporäres Verzeichnis.',
+            'uploadCantWriteErrorMessage' => 'Die Datei konnte auf dem Server nicht gespeichert werden.',
+            'uploadErrorMessage' => 'Beim Hochladen ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es erneut.',
         ]);
 
         $imageOptions = [

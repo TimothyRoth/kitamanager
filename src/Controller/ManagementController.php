@@ -182,7 +182,7 @@ final class ManagementController extends AbstractController
 
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
-            'page_title' => 'Neue Bilder erstellen',
+            'page_title' => 'Neue Bilder hinzufügen',
         ]);
     }
 
@@ -226,6 +226,12 @@ final class ManagementController extends AbstractController
     public function editContent(Request $request, Content $content, ImageUploader $imageUploader, EntityManagerInterface $entityManager): Response
     {
         $this->denyAccessUnlessGranted('EDIT', $content);
+
+        if ($this->isTruncatedUpload($request)) {
+            $this->addFlash('danger', 'Der Upload war zu groß und konnte nicht verarbeitet werden. Bitte laden Sie ein kleineres Bild hoch (max. 10MB).');
+
+            return $this->redirectToRoute('app_management_edit_content', ['id' => $content->getId()]);
+        }
 
         $isArticle = $content->getType() === eContentType::ARTICLE;
         $form = $this->createForm(ContentFormType::class, $content, [
@@ -434,7 +440,7 @@ final class ManagementController extends AbstractController
 
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
-            'page_title' => $isArticle ? 'Neuen Artikel erstellen' : 'Neue Bilder erstellen',
+            'page_title' => $isArticle ? 'Neuen Artikel erstellen' : 'Neue Bilder hinzufügen',
         ]);
     }
 
