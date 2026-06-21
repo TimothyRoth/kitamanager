@@ -40,16 +40,18 @@ when@prod:
                 channels: ["!deprecation"]
                 buffer_size: 50 # How many messages should be saved? Prevent memory leaks
             nested:
-                type: stream
-                path: php://stderr
+                # Rotating file so prod errors land in var/log/prod.log (readable on classic hosting),
+                # while keeping the daily files bounded to avoid unbounded disk growth.
+                type: rotating_file
+                path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
-                formatter: monolog.formatter.json
+                max_files: 14
             console:
                 type: console
                 process_psr_3_messages: false
                 channels: ["!event", "!doctrine"]
             deprecation:
-                type: stream
+                type: rotating_file
                 channels: [deprecation]
-                path: php://stderr
-                formatter: monolog.formatter.json
+                path: "%kernel.logs_dir%/%kernel.environment%.deprecation.log"
+                max_files: 14
