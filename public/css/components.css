@@ -100,14 +100,14 @@ button {
 }
 
 .btn-primary,
-button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn) {
+button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):not(.status-toggle) {
     color: #fff;
     background-color: var(--color-primary);
     border-color: var(--color-primary);
 }
 
 .btn-primary:hover,
-button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):hover {
+button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):not(.status-toggle):hover {
     background-color: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
 }
@@ -121,6 +121,11 @@ button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):hover {
 .btn-danger:hover {
     background-color: var(--color-danger-hover);
     border-color: var(--color-danger-hover);
+}
+
+.btn-danger:disabled,
+button[data-bulk-submit]:disabled {
+    display: none;
 }
 
 .btn-link,
@@ -253,11 +258,82 @@ button.btn-link:hover {
     opacity: 0.5;
 }
 
-.status-indicator {
+/* Clickable status toggle (pill button) */
+.status-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.875rem;
     font-weight: 600;
+    line-height: 1.25;
+    border-radius: 999px;
+    border: 1px solid;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.status-enabled { color: var(--color-success); }
-.status-disabled { color: var(--color-danger); }
+
+.status-toggle:hover {
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.status-toggle:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.status-toggle-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-toggle-active {
+    color: #065f46;
+    background-color: #d1fae5;
+    border-color: #6ee7b7;
+}
+
+.status-toggle-active .status-toggle-dot {
+    background-color: var(--color-success);
+}
+
+.status-toggle-active:hover {
+    background-color: #a7f3d0;
+    border-color: #34d399;
+}
+
+.status-toggle-inactive {
+    color: #991b1b;
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.status-toggle-inactive .status-toggle-dot {
+    background-color: var(--color-danger);
+}
+
+.status-toggle-inactive:hover {
+    background-color: #fecaca;
+    border-color: #f87171;
+}
+
+.status-toggle-hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
+@media (min-width: 768px) {
+    .status-toggle-hint {
+        display: none;
+    }
+}
 
 /* Flashes / Alerts */
 .alert {

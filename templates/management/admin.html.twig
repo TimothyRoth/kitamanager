@@ -147,9 +147,13 @@
                             <input type="hidden" name="_token"
                                    value="{{ csrf_token('toggle-status' ~ content.id) }}">
                             <button type="submit"
-                                    class="btn-link status-indicator {{ content.isEnabled ? 'status-enabled' : 'status-disabled' }}">
+                                    class="status-toggle {{ content.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
+                                    title="Klicken, um den Status zu ändern"
+                                    aria-label="{{ content.isEnabled ? 'Aktiv – klicken zum Deaktivieren' : 'Inaktiv – klicken zum Aktivieren' }}">
+                                <span class="status-toggle-dot" aria-hidden="true"></span>
                                 {{ content.isEnabled ? 'Aktiv' : 'Inaktiv' }}
                             </button>
+                            <span class="status-toggle-hint">Zum Umschalten tippen</span>
                         </form>
                     </div>
                     <div class="data-cell cell-actions">
