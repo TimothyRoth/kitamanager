@@ -35,14 +35,47 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private int $durationBetweenSlides = 10;
 
-    #[ORM\OneToMany(targetEntity: Content::class, mappedBy: 'user', orphanRemoval: true)]
-    #[ORM\OrderBy(['displayOrder' => 'ASC'])]
+    /**
+     * Content created (owned) by this user.
+     *
+     * @var Collection<int, Content>
+     */
+    #[ORM\OneToMany(targetEntity: Content::class, mappedBy: 'creator', orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'ASC'])]
     private Collection $content;
+
+    /**
+     * Users this user is allowed to publish content to (assigned by an admin).
+     * Self is always implicitly included and is not stored here.
+     *
+     * @var Collection<int, User>
+     */
+    #[ORM\ManyToMany(targetEntity: self::class)]
+    #[ORM\JoinTable(name: 'user_publish_target')]
+    #[ORM\JoinColumn(name: 'source_user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'target_user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Collection $publishTargets;
+
+    /**
+     * When true this user may publish to every user (present and future).
+     */
+    #[ORM\Column(name: 'publish_to_all', type: 'boolean', options: ['default' => false])]
+    private bool $publishToAll = false;
+
+    /**
+     * Slider entries delivered to this user (as a consumer).
+     *
+     * @var Collection<int, SliderItem>
+     */
+    #[ORM\OneToMany(targetEntity: SliderItem::class, mappedBy: 'consumer', orphanRemoval: true)]
+    private Collection $sliderItems;
 
     public function __construct()
     {
         $this->roles = ['ROLE_USER'];
         $this->content = new ArrayCollection();
+        $this->publishTargets = new ArrayCollection();
+        $this->sliderItems = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -153,7 +186,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         if (!$this->content->contains($content)) {
             $this->content->add($content);
-            $content->setUser($this);
+            $content->setCreator($this);
         }
 
         return $this;
@@ -163,12 +196,56 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         if ($this->content->removeElement($content)) {
             // set the owning side to null (unless already changed)
-            if ($content->getUser() === $this) {
-                $content->setUser(null);
+            if ($content->getCreator() === $this) {
+                $content->setCreator(null);
             }
         }
 
         return $this;
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function getPublishTargets(): Collection
+    {
+        return $this->publishTargets;
+    }
+
+    public function addPublishTarget(User $user): static
+    {
+        if ($user !== $this && !$this->publishTargets->contains($user)) {
+            $this->publishTargets->add($user);
+        }
+
+        return $this;
+    }
+
+    public function removePublishTarget(User $user): static
+    {
+        $this->publishTargets->removeElement($user);
+
+        return $this;
+    }
+
+    public function isPublishToAll(): bool
+    {
+        return $this->publishToAll;
+    }
+
+    public function setPublishToAll(bool $publishToAll): static
+    {
+        $this->publishToAll = $publishToAll;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, SliderItem>
+     */
+    public function getSliderItems(): Collection
+    {
+        return $this->sliderItems;
     }
 
     /**

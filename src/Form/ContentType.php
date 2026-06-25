@@ -3,7 +3,10 @@
 namespace App\Form;
 
 use App\Entity\Content;
+use App\Entity\User;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -66,6 +69,30 @@ class ContentType extends AbstractType
                     'constraints' => [new NotBlank(['message' => 'Bitte geben Sie einen Inhalt an.'])],
                 ]);
         }
+
+        // Audience selection is only shown when the creator may publish to others.
+        if (!empty($options['audience_choices'])) {
+            $builder->add('audienceAll', CheckboxType::class, [
+                'mapped' => false,
+                'required' => false,
+                'label' => 'An alle zugewiesenen Benutzer ausspielen',
+                'data' => $options['audience_all_default'],
+                'attr' => ['data-audience-all' => ''],
+            ]);
+
+            $builder->add('audience', EntityType::class, [
+                'class' => User::class,
+                'mapped' => false,
+                'multiple' => true,
+                'expanded' => true,
+                'required' => false,
+                'label' => 'Sichtbar für',
+                'choice_label' => 'username',
+                'choices' => $options['audience_choices'],
+                'data' => $options['audience_selected'],
+                'attr' => ['data-audience-list' => ''],
+            ]);
+        }
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -75,6 +102,9 @@ class ContentType extends AbstractType
             'is_article' => false,
             'is_new' => true,
             'multiple' => false,
+            'audience_choices' => [],
+            'audience_selected' => [],
+            'audience_all_default' => false,
         ]);
     }
 }

@@ -50,12 +50,9 @@ class ContentVoter extends Voter
             return true;
         }
 
-        // If content is global (has no user), non-admins cannot touch it
-        if (null === $content->getUser()) {
-            return false;
-        }
-
-        // Otherwise, check if the user is the owner
-        return $content->getUser()->getId() === $user->getId();
+        // Only the creator may edit/delete the content itself (this removes it
+        // for every consumer). Consumers only control their own SliderItem.
+        return null !== $content->getCreator()
+            && $content->getCreator()->getId() === $user->getId();
     }
 }

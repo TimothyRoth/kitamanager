@@ -225,6 +225,33 @@ document.addEventListener('DOMContentLoaded', () => {
         refresh();
     };
 
+    // Hide the per-user selection list while an "all users" checkbox is active,
+    // both for the admin's user-assignment form and the content audience form.
+    const initAllToggles = () => {
+        const pairs = [
+            {checkbox: 'input[type="checkbox"][name$="[publishToAll]"]', list: '[data-publish-targets]'},
+            {checkbox: '[data-audience-all]', list: '[data-audience-list]'},
+        ];
+
+        pairs.forEach(({checkbox, list}) => {
+            document.querySelectorAll(checkbox).forEach(input => {
+                if (input.dataset.allToggleInitialized === 'true') return;
+                input.dataset.allToggleInitialized = 'true';
+
+                const form = input.closest('form') || document;
+                const target = form.querySelector(list);
+                if (!target) return;
+
+                const apply = () => {
+                    target.style.display = input.checked ? 'none' : '';
+                };
+
+                input.addEventListener('change', apply);
+                apply();
+            });
+        });
+    };
+
     // Initialize multi-image upload preview
     const initImagePreview = () => {
         const inputs = document.querySelectorAll('.image-multi-upload');
@@ -456,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initBulkDelete();
     initImagePreview();
     initUploadProgress();
+    initAllToggles();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
@@ -465,5 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initBulkDelete();
         initImagePreview();
         initUploadProgress();
+        initAllToggles();
     });
 });

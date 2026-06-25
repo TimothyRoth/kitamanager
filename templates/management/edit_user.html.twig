@@ -14,6 +14,12 @@
             <div class="form-group">
                 {{ form_row(form.plainPassword, {'required': false, 'label': 'Neues Passwort (nur nötig bei Änderung)'}) }}
             </div>
+            <div class="form-group">
+                {{ form_row(form.publishToAll) }}
+            </div>
+            <div class="form-group" data-publish-targets>
+                {{ form_row(form.publishTargets) }}
+            </div>
             <button type="submit" class="btn btn-primary">Änderungen speichern</button>
             {{ form_end(form) }}
 

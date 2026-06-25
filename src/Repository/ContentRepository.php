@@ -18,33 +18,16 @@ class ContentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Content created (owned) by a user.
+     *
      * @return Content[]
      */
-    public function findEnabledByUser(User $user): array
+    public function findByCreator(User $creator): array
     {
         return $this->createQueryBuilder('c')
-            ->andWhere('c.user = :user')
-            ->andWhere('c.isEnabled = :isEnabled')
-            ->setParameter('user', $user)
-            ->setParameter('isEnabled', true)
-            ->orderBy('c.displayOrder', 'ASC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
-     * @return Content[]
-     */
-    public function findAvailableForUser(User $user): array
-    {
-        return $this->createQueryBuilder('c')
-            ->addSelect('CASE WHEN c.user IS NULL THEN 0 ELSE 1 END AS HIDDEN sort_group')
-            ->where('c.isEnabled = :isEnabled')
-            ->andWhere('c.user = :user OR c.user IS NULL')
-            ->setParameter('isEnabled', true)
-            ->setParameter('user', $user)
-            ->orderBy('sort_group', 'ASC')
-            ->addOrderBy('c.displayOrder', 'ASC')
+            ->andWhere('c.creator = :creator')
+            ->setParameter('creator', $creator)
+            ->orderBy('c.createdAt', 'ASC')
             ->getQuery()
             ->getResult();
     }

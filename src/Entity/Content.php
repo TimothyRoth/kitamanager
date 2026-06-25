@@ -4,8 +4,9 @@ namespace App\Entity;
 
 use App\Enum\ContentType;
 use App\Repository\ContentRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
-use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ContentRepository::class)]
@@ -18,8 +19,8 @@ class Content
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'content')]
-    #[ORM\JoinColumn(name: 'User_Id', nullable: true, onDelete: 'CASCADE')]
-    private ?User $user = null;
+    #[ORM\JoinColumn(name: 'User_Id', nullable: false, onDelete: 'CASCADE')]
+    private ?User $creator = null;
 
     #[ORM\Column(name: 'Type', type: Types::STRING, enumType: ContentType::class)]
     private ?ContentType $type = null;
@@ -39,54 +40,24 @@ class Content
     #[ORM\Column(name: 'Last_Updated_At')]
     private ?\DateTimeImmutable $lastUpdatedAt = null;
 
-    #[ORM\Column(name: 'display_order', type: Types::INTEGER)]
-    private int $displayOrder = 0;
+    /**
+     * When true the audience is resolved dynamically to all of the creator's
+     * currently allowed publish targets (present and future users).
+     */
+    #[ORM\Column(name: 'audience_all', type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $audienceAll = false;
 
-    #[ORM\Column(name: 'is_enabled', type: Types::BOOLEAN, options: ['default' => true])]
-    private bool $isEnabled = true;
+    /**
+     * @var Collection<int, SliderItem>
+     */
+    #[ORM\OneToMany(targetEntity: SliderItem::class, mappedBy: 'content', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $sliderItems;
 
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->lastUpdatedAt = new \DateTimeImmutable();
-    }
-
-    #[ORM\PrePersist]
-    public function prePersist(PrePersistEventArgs $args): void
-    {
-        $entityManager = $args->getObjectManager();
-        $repository = $entityManager->getRepository(Content::class);
-
-        $qb = $repository->createQueryBuilder('c')
-            ->select('MAX(c.displayOrder)');
-
-        if ($this->getUser()) {
-            $qb->where('c.user = :user')->setParameter('user', $this->getUser());
-        } else {
-            $qb->where('c.user IS NULL');
-        }
-
-        $highestOrder = (int) ($qb->getQuery()->getSingleScalarResult() ?? 0);
-
-        // During a bulk insert (e.g. multi-image upload) none of the sibling rows are
-        // flushed yet, so the MAX query above would return the same value for all of them.
-        // Count the siblings already scheduled in this UnitOfWork within the same scope
-        // (same owning user, or all global) so each gets a unique, incrementing order.
-        $pendingSiblings = 0;
-        foreach ($entityManager->getUnitOfWork()->getScheduledEntityInsertions() as $scheduled) {
-            if ($scheduled === $this || !$scheduled instanceof self) {
-                continue;
-            }
-
-            $scheduledUserId = $scheduled->getUser()?->getId();
-            $thisUserId = $this->getUser()?->getId();
-
-            if ($scheduledUserId === $thisUserId) {
-                $pendingSiblings++;
-            }
-        }
-
-        $this->displayOrder = $highestOrder + $pendingSiblings + 1;
+        $this->sliderItems = new ArrayCollection();
     }
 
     #[ORM\PreUpdate]
@@ -100,14 +71,14 @@ class Content
         return $this->id;
     }
 
-    public function getUser(): ?User
+    public function getCreator(): ?User
     {
-        return $this->user;
+        return $this->creator;
     }
 
-    public function setUser(?User $user): static
+    public function setCreator(?User $creator): static
     {
-        $this->user = $user;
+        $this->creator = $creator;
 
         return $this;
     }
@@ -184,26 +155,43 @@ class Content
         return $this;
     }
 
-    public function getDisplayOrder(): int
+    public function isAudienceAll(): bool
     {
-        return $this->displayOrder;
+        return $this->audienceAll;
     }
 
-    public function setDisplayOrder(int $displayOrder): static
+    public function setAudienceAll(bool $audienceAll): static
     {
-        $this->displayOrder = $displayOrder;
+        $this->audienceAll = $audienceAll;
 
         return $this;
     }
 
-    public function isEnabled(): bool
+    /**
+     * @return Collection<int, SliderItem>
+     */
+    public function getSliderItems(): Collection
     {
-        return $this->isEnabled;
+        return $this->sliderItems;
     }
 
-    public function setIsEnabled(bool $isEnabled): static
+    public function addSliderItem(SliderItem $sliderItem): static
     {
-        $this->isEnabled = $isEnabled;
+        if (!$this->sliderItems->contains($sliderItem)) {
+            $this->sliderItems->add($sliderItem);
+            $sliderItem->setContent($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSliderItem(SliderItem $sliderItem): static
+    {
+        if ($this->sliderItems->removeElement($sliderItem)) {
+            if ($sliderItem->getContent() === $this) {
+                $sliderItem->setContent(null);
+            }
+        }
 
         return $this;
     }

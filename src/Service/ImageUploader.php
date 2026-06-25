@@ -45,7 +45,7 @@ class ImageUploader
         return '/uploads/' . $subDirectory . '/' . $fileName;
     }
 
-    public function delete(string $filePath): void
+    public function delete(?string $filePath): void
     {
         if (empty($filePath)) {
             return;

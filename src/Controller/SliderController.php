@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Repository\ContentRepository;
+use App\Repository\SliderItemRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class SliderController extends AbstractController
 {
     #[Route('/slider/{slug?}', name: 'app_slider')]
-    public function index(?User $user, ContentRepository $contentRepository): Response
+    public function index(?User $user, SliderItemRepository $sliderItemRepository): Response
     {
         if (!$user) {
             /** @var User|null $user */
@@ -23,8 +23,8 @@ final class SliderController extends AbstractController
             }
         }
 
-        $contents = $contentRepository->findAvailableForUser($user);
-        $slides = $this->renderView('slider/_slides.html.twig', ['contents' => $contents]);
+        $items = $sliderItemRepository->findEnabledForConsumer($user);
+        $slides = $this->renderView('slider/_slides.html.twig', ['items' => $items]);
 
         return $this->render('slider/slider.html.twig', [
             'user' => $user,
@@ -40,10 +40,10 @@ final class SliderController extends AbstractController
      * changed slide duration).
      */
     #[Route('/slider/{slug}/content', name: 'app_slider_content', methods: ['GET'])]
-    public function content(User $user, ContentRepository $contentRepository): JsonResponse
+    public function content(User $user, SliderItemRepository $sliderItemRepository): JsonResponse
     {
-        $contents = $contentRepository->findAvailableForUser($user);
-        $slides = $this->renderView('slider/_slides.html.twig', ['contents' => $contents]);
+        $items = $sliderItemRepository->findEnabledForConsumer($user);
+        $slides = $this->renderView('slider/_slides.html.twig', ['items' => $items]);
 
         return new JsonResponse([
             'signature' => md5($slides),

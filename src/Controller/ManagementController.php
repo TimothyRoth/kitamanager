@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Content;
+use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Form\ChangePasswordType;
 use App\Form\ContentType as ContentFormType;
@@ -10,13 +11,16 @@ use App\Enum\ContentType as eContentType;
 use App\Form\UserDurationType;
 use App\Form\UserType;
 use App\Repository\ContentRepository;
+use App\Repository\SliderItemRepository;
 use App\Repository\UserRepository;
+use App\Service\AudienceSynchronizer;
 use App\Service\ImageUploader;
 use App\Service\UserPasswordUpdater;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,7 +32,7 @@ final class ManagementController extends AbstractController
 {
     #[Route('/admin', name: 'app_management_admin')]
     #[IsGranted('ROLE_ADMIN')]
-    public function adminAction(Request $request, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, UserRepository $userRepository, ContentRepository $contentRepository): Response
+    public function adminAction(Request $request, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, UserRepository $userRepository, ContentRepository $contentRepository, AudienceSynchronizer $audienceSynchronizer): Response
     {
         $user = new User();
         $form = $this->createForm(UserType::class, $user, ['is_new' => true]);
@@ -40,6 +44,11 @@ final class ManagementController extends AbstractController
                 $user->setRoles(['ROLE_USER']);
 
                 $entityManager->persist($user);
+                $entityManager->flush();
+
+                // Deliver existing "publish to all" content from other creators
+                // to the freshly created consumer.
+                $audienceSynchronizer->onUserCreated($user);
                 $entityManager->flush();
 
                 $this->addFlash('success', 'Benutzer wurde erfolgreich hinzugefügt.');
@@ -57,19 +66,21 @@ final class ManagementController extends AbstractController
             ? Response::HTTP_UNPROCESSABLE_ENTITY
             : Response::HTTP_OK;
 
+        /** @var User $admin */
+        $admin = $this->getUser();
+
         return $this->render('management/admin.html.twig', [
             'users' => $userRepository->getUsersByRole('ROLE_USER'),
-            'globalContents' => $contentRepository->findBy(['user' => null], ['displayOrder' => 'ASC']),
+            'contents' => $contentRepository->findByCreator($admin),
             'form' => $form->createView(),
         ], new Response(null, $status));
     }
 
     #[Route('/user', name: 'app_management_user')]
-    public function userAction(Request $request, EntityManagerInterface $entityManager, UserPasswordUpdater $passwordUpdater): Response
+    public function userAction(Request $request, EntityManagerInterface $entityManager, UserPasswordUpdater $passwordUpdater, ContentRepository $contentRepository, SliderItemRepository $sliderItemRepository): Response
     {
         /** @var User $user */
         $user = $this->getUser();
-        $contents = $user->getContent();
 
         $durationForm = $this->createForm(UserDurationType::class, $user);
         $durationForm->handleRequest($request);
@@ -93,7 +104,8 @@ final class ManagementController extends AbstractController
         }
 
         return $this->render('management/user.html.twig', [
-            'contents' => $contents,
+            'contents' => $contentRepository->findByCreator($user),
+            'sliderItems' => $sliderItemRepository->findAllForConsumer($user),
             'durationForm' => $durationForm->createView(),
             'passwordForm' => $passwordForm->createView(),
         ]);
@@ -101,15 +113,22 @@ final class ManagementController extends AbstractController
 
     #[Route('/admin/edit-user/{id}', name: 'app_management_edit_user')]
     #[IsGranted('ROLE_ADMIN')]
-    public function editUser(Request $request, User $user, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager): Response
+    public function editUser(Request $request, User $user, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
-        $form = $this->createForm(UserType::class, $user, ['is_new' => false]);
+        // Capture the allowed targets before the form changes them, so we can
+        // retract content for targets that get removed.
+        $oldAllowedIds = $audienceSynchronizer->resolveAllowedTargetIds($user);
+
+        $form = $this->createForm(UserType::class, $user, ['is_new' => false, 'current_user_id' => $user->getId()]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
                 $passwordUpdater->update($user, $form->get('plainPassword')->getData());
 
+                $entityManager->flush();
+
+                $audienceSynchronizer->syncCreatorTargets($user, $oldAllowedIds);
                 $entityManager->flush();
 
                 $this->addFlash('success', 'Der Benutzer wurde erfolgreich aktualisiert.');
@@ -149,7 +168,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-image', name: 'app_management_create_image')]
-    public function createImage(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager): Response
+    public function createImage(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 10MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
@@ -157,22 +176,39 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_create_image');
         }
 
+        /** @var User $creator */
+        $creator = $this->getUser();
+        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+
         $content = new Content();
-        $form = $this->createForm(ContentFormType::class, $content, ['is_article' => false, 'multiple' => true]);
+        $form = $this->createForm(ContentFormType::class, $content, [
+            'is_article' => false,
+            'multiple' => true,
+            'audience_choices' => $allowed,
+            'audience_all_default' => true,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var UploadedFile[] $imageFiles */
             $imageFiles = $form->get('imageFile')->getData();
+            ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
 
+            $created = [];
             foreach ($imageFiles as $imageFile) {
                 $image = new Content();
-                $image->setImageUrl($imageUploader->upload($imageFile, $this->getUser()->getId()));
+                $image->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
                 $image->setType(eContentType::IMAGE);
-                $image->setUser($this->getUser());
+                $image->setCreator($creator);
                 $entityManager->persist($image);
+                $created[] = $image;
             }
 
+            $entityManager->flush();
+
+            foreach ($created as $image) {
+                $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
+            }
             $entityManager->flush();
 
             $this->addFlash('success', sprintf('%d Bild(er) erfolgreich hochgeladen!', count($imageFiles)));
@@ -187,7 +223,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-article', name: 'app_management_create_article')]
-    public function createArticle(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager): Response
+    public function createArticle(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 10MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
@@ -195,20 +231,32 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_create_article');
         }
 
+        /** @var User $creator */
+        $creator = $this->getUser();
+        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+
         $content = new Content();
-        $form = $this->createForm(ContentFormType::class, $content, ['is_article' => true]);
+        $form = $this->createForm(ContentFormType::class, $content, [
+            'is_article' => true,
+            'audience_choices' => $allowed,
+            'audience_all_default' => true,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var UploadedFile $imageFile */
             $imageFile = $form->get('imageFile')->getData();
-            $imageUrl = $imageUploader->upload($imageFile, $this->getUser()->getId());
+            $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
 
             $content->setImageUrl($imageUrl);
             $content->setType(eContentType::ARTICLE);
-            $content->setUser($this->getUser());
+            $content->setCreator($creator);
 
             $entityManager->persist($content);
+            $entityManager->flush();
+
+            ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+            $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
             $entityManager->flush();
 
             $this->addFlash('success', 'Artikel erfolgreich erstellt!');
@@ -223,7 +271,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/edit-content/{id}', name: 'app_management_edit_content')]
-    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, EntityManagerInterface $entityManager): Response
+    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository): Response
     {
         $this->denyAccessUnlessGranted('EDIT', $content);
 
@@ -233,10 +281,26 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_edit_content', ['id' => $content->getId()]);
         }
 
+        $creator = $content->getCreator();
+        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+        $allowedIds = array_map(static fn (User $u) => $u->getId(), $allowed);
+
+        // Pre-select consumers that currently receive this content (excluding the creator).
+        $selected = [];
+        foreach ($sliderItemRepository->findByContent($content) as $item) {
+            $consumer = $item->getConsumer();
+            if ($consumer->getId() !== $creator->getId() && in_array($consumer->getId(), $allowedIds, true)) {
+                $selected[] = $consumer;
+            }
+        }
+
         $isArticle = $content->getType() === eContentType::ARTICLE;
         $form = $this->createForm(ContentFormType::class, $content, [
             'is_article' => $isArticle,
             'is_new' => false,
+            'audience_choices' => $allowed,
+            'audience_selected' => $selected,
+            'audience_all_default' => $content->isAudienceAll(),
         ]);
         $form->handleRequest($request);
 
@@ -245,12 +309,19 @@ final class ManagementController extends AbstractController
             $imageFile = $form->get('imageFile')->getData();
             if ($imageFile) {
                 $oldImageUrl = $content->getImageUrl();
-                $newImageUrl = $imageUploader->upload($imageFile, $this->getUser()->getId());
+                $newImageUrl = $imageUploader->upload($imageFile, $creator->getId());
                 $content->setImageUrl($newImageUrl);
                 $imageUploader->delete($oldImageUrl);
             }
 
             $entityManager->flush();
+
+            if ($form->has('audience')) {
+                ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+                $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                $entityManager->flush();
+            }
+
             $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
 
             return $this->redirectToRoute('app_management_user');
@@ -276,7 +347,7 @@ final class ManagementController extends AbstractController
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
         }
 
-        return $this->redirectToRoute('app_management_user');
+        return $this->redirectToRoute($this->dashboardRoute());
     }
 
     #[Route('/content/bulk-delete', name: 'app_management_bulk_delete_content', methods: ['POST'])]
@@ -317,131 +388,103 @@ final class ManagementController extends AbstractController
         return $this->redirectToRoute($redirectRoute);
     }
 
-    #[Route('/user/content/{id}/move-up', name: 'app_management_content_move_up', methods: ['POST'])]
-    public function moveContentUp(Request $request, Content $content, EntityManagerInterface $entityManager, ContentRepository $contentRepository): Response
+    #[Route('/slider-item/{id}/move-up', name: 'app_management_slider_move_up', methods: ['POST'])]
+    public function moveSliderItemUp(Request $request, SliderItem $item, EntityManagerInterface $entityManager, SliderItemRepository $sliderItemRepository): Response
     {
-        $this->denyAccessUnlessGranted('EDIT', $content);
+        $this->denyAccessUnlessGranted('MANAGE', $item);
 
-        if ($this->isCsrfTokenValid('move-up' . $content->getId(), $request->request->get('_token'))) {
-            $qb = $contentRepository->createQueryBuilder('c');
-            if ($content->getUser()) {
-                $qb->where('c.user = :user')->setParameter('user', $this->getUser());
-            } else {
-                $qb->where('c.user IS NULL');
-            }
-            $qb->andWhere('c.displayOrder < :order')->setParameter('order', $content->getDisplayOrder())->orderBy('c.displayOrder', 'DESC');
-            $previousContent = $qb->setMaxResults(1)->getQuery()->getOneOrNullResult();
-
-            if ($previousContent) {
-                $currentOrder = $content->getDisplayOrder();
-                $content->setDisplayOrder($previousContent->getDisplayOrder());
-                $previousContent->setDisplayOrder($currentOrder);
+        if ($this->isCsrfTokenValid('move-up' . $item->getId(), $request->request->get('_token'))) {
+            $previous = $this->adjacentSliderItem($sliderItemRepository, $item, 'up');
+            if ($previous) {
+                $this->swapOrder($item, $previous);
                 $entityManager->flush();
             }
         }
 
-        return $this->redirectToRoute($content->getUser() ? 'app_management_user' : 'app_management_admin');
+        return $this->redirectToRoute('app_management_user');
     }
 
-    #[Route('/user/content/{id}/move-down', name: 'app_management_content_move_down', methods: ['POST'])]
-    public function moveContentDown(Request $request, Content $content, EntityManagerInterface $entityManager, ContentRepository $contentRepository): Response
+    #[Route('/slider-item/{id}/move-down', name: 'app_management_slider_move_down', methods: ['POST'])]
+    public function moveSliderItemDown(Request $request, SliderItem $item, EntityManagerInterface $entityManager, SliderItemRepository $sliderItemRepository): Response
     {
-        $this->denyAccessUnlessGranted('EDIT', $content);
+        $this->denyAccessUnlessGranted('MANAGE', $item);
 
-        if ($this->isCsrfTokenValid('move-down' . $content->getId(), $request->request->get('_token'))) {
-            $qb = $contentRepository->createQueryBuilder('c');
-            if ($content->getUser()) {
-                $qb->where('c.user = :user')->setParameter('user', $this->getUser());
-            } else {
-                $qb->where('c.user IS NULL');
-            }
-            $qb->andWhere('c.displayOrder > :order')->setParameter('order', $content->getDisplayOrder())->orderBy('c.displayOrder', 'ASC');
-            $nextContent = $qb->setMaxResults(1)->getQuery()->getOneOrNullResult();
-
-            if ($nextContent) {
-                $currentOrder = $content->getDisplayOrder();
-                $content->setDisplayOrder($nextContent->getDisplayOrder());
-                $nextContent->setDisplayOrder($currentOrder);
+        if ($this->isCsrfTokenValid('move-down' . $item->getId(), $request->request->get('_token'))) {
+            $next = $this->adjacentSliderItem($sliderItemRepository, $item, 'down');
+            if ($next) {
+                $this->swapOrder($item, $next);
                 $entityManager->flush();
             }
         }
 
-        return $this->redirectToRoute($content->getUser() ? 'app_management_user' : 'app_management_admin');
+        return $this->redirectToRoute('app_management_user');
     }
 
-    #[Route('/user/content/{id}/toggle-status', name: 'app_management_content_toggle_status', methods: ['POST'])]
-    public function toggleContentStatus(Request $request, Content $content, EntityManagerInterface $entityManager): Response
+    #[Route('/slider-item/{id}/toggle-status', name: 'app_management_slider_toggle_status', methods: ['POST'])]
+    public function toggleSliderItemStatus(Request $request, SliderItem $item, EntityManagerInterface $entityManager): Response
     {
-        $this->denyAccessUnlessGranted('EDIT', $content);
+        $this->denyAccessUnlessGranted('MANAGE', $item);
 
-        if ($this->isCsrfTokenValid('toggle-status' . $content->getId(), $request->request->get('_token'))) {
-            $content->setIsEnabled(!$content->isEnabled());
+        if ($this->isCsrfTokenValid('toggle-status' . $item->getId(), $request->request->get('_token'))) {
+            $item->setIsEnabled(!$item->isEnabled());
             $entityManager->flush();
 
-            $status = $content->isEnabled() ? 'aktiviert' : 'deaktiviert';
+            $status = $item->isEnabled() ? 'aktiviert' : 'deaktiviert';
             $this->addFlash('success', "Inhalt wurde erfolgreich {$status}.");
         }
 
-        return $this->redirectToRoute($content->getUser() ? 'app_management_user' : 'app_management_admin');
+        return $this->redirectToRoute('app_management_user');
     }
 
-    #[Route('/admin/create-global-content', name: 'app_management_create_global_content')]
-    #[IsGranted('ROLE_ADMIN')]
-    public function adminCreateContent(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager): Response
+    private function adjacentSliderItem(SliderItemRepository $repository, SliderItem $item, string $direction): ?SliderItem
     {
-        // Determine if creating an article or image based on a query parameter, for example
-        $isArticle = $request->query->getBoolean('is_article', false);
+        $qb = $repository->createQueryBuilder('si')
+            ->andWhere('si.consumer = :consumer')
+            ->setParameter('consumer', $item->getConsumer())
+            ->setMaxResults(1);
 
-        if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 10MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
-
-            return $this->redirectToRoute('app_management_create_global_content', ['is_article' => $isArticle ? 1 : 0]);
+        if ('up' === $direction) {
+            $qb->andWhere('si.displayOrder < :order')
+                ->orderBy('si.displayOrder', 'DESC');
+        } else {
+            $qb->andWhere('si.displayOrder > :order')
+                ->orderBy('si.displayOrder', 'ASC');
         }
 
-        $content = new Content();
+        return $qb->setParameter('order', $item->getDisplayOrder())
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 
-        $form = $this->createForm(ContentFormType::class, $content, [
-            'is_article' => $isArticle,
-            'multiple' => !$isArticle,
-        ]);
-        $form->handleRequest($request);
+    private function swapOrder(SliderItem $a, SliderItem $b): void
+    {
+        $orderA = $a->getDisplayOrder();
+        $a->setDisplayOrder($b->getDisplayOrder());
+        $b->setDisplayOrder($orderA);
+    }
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            if ($isArticle) {
-                /** @var UploadedFile $imageFile */
-                $imageFile = $form->get('imageFile')->getData();
-                $content->setImageUrl($imageUploader->upload($imageFile, null));
-                $content->setType(eContentType::ARTICLE);
-                $content->setUser(null); // Explicitly set user to null for global content
+    /**
+     * @return array{ids: int[], all: bool}
+     */
+    private function extractAudience(FormInterface $form): array
+    {
+        if (!$form->has('audience')) {
+            return ['ids' => [], 'all' => false];
+        }
 
-                $entityManager->persist($content);
-                $entityManager->flush();
-
-                $this->addFlash('success', 'Globaler Inhalt erfolgreich erstellt!');
-            } else {
-                /** @var UploadedFile[] $imageFiles */
-                $imageFiles = $form->get('imageFile')->getData();
-
-                foreach ($imageFiles as $imageFile) {
-                    $image = new Content();
-                    $image->setImageUrl($imageUploader->upload($imageFile, null)); // null for global content
-                    $image->setType(eContentType::IMAGE);
-                    $image->setUser(null);
-                    $entityManager->persist($image);
-                }
-
-                $entityManager->flush();
-
-                $this->addFlash('success', sprintf('%d globale(s) Bild(er) erfolgreich erstellt!', count($imageFiles)));
+        $ids = [];
+        foreach ($form->get('audience')->getData() as $user) {
+            if ($user instanceof User) {
+                $ids[] = $user->getId();
             }
-
-            return $this->redirectToRoute('app_management_admin');
         }
 
-        return $this->render('management/create_content.html.twig', [
-            'form' => $form->createView(),
-            'page_title' => $isArticle ? 'Neuen Artikel erstellen' : 'Neue Bilder hinzufügen',
-        ]);
+        return ['ids' => $ids, 'all' => (bool) $form->get('audienceAll')->getData()];
+    }
+
+    private function dashboardRoute(): string
+    {
+        return $this->isGranted('ROLE_ADMIN') ? 'app_management_admin' : 'app_management_user';
     }
 
     /**

@@ -1,4 +1,5 @@
-{% for content in contents %}
+{% for item in items %}
+    {% set content = item.content %}
     {% if content.type.value == 'image' %}
         <div class="tv-slide tv-slide-image {% if loop.first %}is-active{% endif %}"
              data-slide-key="{{ content.id }}-{{ content.lastUpdatedAt.timestamp }}">
