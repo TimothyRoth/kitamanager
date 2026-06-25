@@ -71,32 +71,115 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Initialize TV Slider logic
-    const initTvSlider = () => {
-        const sliderContainer = document.getElementById('tv-slider');
-        if (!sliderContainer) return;
-
-        // Prevent multiple intervals if Turbo re-renders
+    // (Re)start the rotation interval for the slider, continuing from whichever
+    // slide is currently active so a background content refresh doesn't jump.
+    const startSliderRotation = (viewport) => {
         if (window.tvSliderInterval) {
             clearInterval(window.tvSliderInterval);
         }
 
-        const slides = sliderContainer.querySelectorAll('.tv-slide');
-        if (slides.length <= 1) return; // No need to slide if 0 or 1 item
+        const slides = Array.from(viewport.querySelectorAll('.tv-slide'));
+        if (slides.length <= 1) return; // No need to rotate 0 or 1 item
 
-        const durationMs = parseInt(sliderContainer.getAttribute('data-duration'), 10) || 10000;
-        let currentIndex = 0;
+        const durationMs = parseInt(viewport.getAttribute('data-duration'), 10) || 10000;
+
+        let currentIndex = slides.findIndex(slide => slide.classList.contains('is-active'));
+        if (currentIndex < 0) {
+            currentIndex = 0;
+            slides[0].classList.add('is-active');
+        }
 
         window.tvSliderInterval = setInterval(() => {
-            // Remove active class from current
             slides[currentIndex].classList.remove('is-active');
-
-            // Move to next index, looping back to 0
             currentIndex = (currentIndex + 1) % slides.length;
-
-            // Add active class to new current
             slides[currentIndex].classList.add('is-active');
         }, durationMs);
+    };
+
+    // Initialize TV Slider logic
+    const initTvSlider = () => {
+        const viewport = document.getElementById('tv-slider');
+        if (!viewport) return;
+
+        startSliderRotation(viewport);
+    };
+
+    // Seamlessly swap the slide set. The slide currently on screen is preserved
+    // (matched by its data-slide-key), so the viewer sees no flash when the
+    // content set changes; added/removed items just affect the ongoing rotation.
+    const applySlides = (viewport, html) => {
+        const currentActive = viewport.querySelector('.tv-slide.is-active');
+        const currentKey = currentActive ? currentActive.dataset.slideKey : null;
+
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+
+        const newSlides = Array.from(temp.querySelectorAll('.tv-slide'));
+        newSlides.forEach(slide => slide.classList.remove('is-active'));
+
+        if (newSlides.length > 0) {
+            let activeIndex = 0;
+            if (currentKey) {
+                const matchIndex = newSlides.findIndex(slide => slide.dataset.slideKey === currentKey);
+                if (matchIndex !== -1) {
+                    activeIndex = matchIndex;
+                }
+            }
+            newSlides[activeIndex].classList.add('is-active');
+        }
+
+        viewport.innerHTML = temp.innerHTML;
+        startSliderRotation(viewport);
+    };
+
+    // Poll the slider content endpoint and apply changes in the background.
+    const initSliderAutoRefresh = () => {
+        const viewport = document.getElementById('tv-slider');
+        if (!viewport) return;
+
+        const url = viewport.dataset.refreshUrl;
+        if (!url) return;
+
+        if (window.tvSliderRefreshTimer) {
+            clearInterval(window.tvSliderRefreshTimer);
+        }
+
+        const intervalMs = parseInt(viewport.dataset.refreshInterval, 10) || 30000;
+        let knownSignature = viewport.dataset.contentSignature || null;
+
+        const poll = async () => {
+            if (document.hidden) return; // skip while tab/screen is not visible
+
+            try {
+                const response = await fetch(url, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    cache: 'no-store',
+                });
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const newDuration = String(data.duration);
+                const durationChanged = newDuration !== viewport.getAttribute('data-duration');
+
+                if (data.signature === knownSignature) {
+                    // Content unchanged; only restart rotation if the duration changed.
+                    if (durationChanged) {
+                        viewport.setAttribute('data-duration', newDuration);
+                        startSliderRotation(viewport);
+                    }
+                    return;
+                }
+
+                knownSignature = data.signature;
+                viewport.dataset.contentSignature = data.signature;
+                viewport.setAttribute('data-duration', newDuration);
+                applySlides(viewport, data.html);
+            } catch (e) {
+                // Ignore transient network errors; the next poll will retry.
+            }
+        };
+
+        window.tvSliderRefreshTimer = setInterval(poll, intervalMs);
     };
 
     // Initialize bulk-delete selection
@@ -358,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Run initializations
     initWysiwyg();
     initTvSlider();
+    initSliderAutoRefresh();
     initBulkDelete();
     initImagePreview();
     initUploadProgress();
@@ -366,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('turbo:render', () => {
         initWysiwyg();
         initTvSlider();
+        initSliderAutoRefresh();
         initBulkDelete();
         initImagePreview();
         initUploadProgress();

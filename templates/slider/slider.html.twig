@@ -5,32 +5,10 @@
 {% block body %}
     <div class="tv-slider-viewport"
          data-duration="{{ user.durationBetweenSlides * 1000 }}"
+         data-refresh-url="{{ path('app_slider_content', {'slug': user.slug}) }}"
+         data-refresh-interval="30000"
+         data-content-signature="{{ signature }}"
          id="tv-slider">
-
-        {% for content in contents %}
-            {% if content.type.value == 'image' %}
-                <div class="tv-slide tv-slide-image {% if loop.first %}is-active{% endif %}">
-                    <img src="{{ asset(content.imageUrl) }}" alt="Slider Image">
-                </div>
-            {% elseif content.type.value == 'article' %}
-                <div class="tv-slide tv-slide-article {% if loop.first %}is-active{% endif %}">
-                    <div class="tv-article-media">
-                        {% if content.imageUrl %}
-                            <img src="{{ asset(content.imageUrl) }}" alt="Article Image">
-                        {% endif %}
-                    </div>
-                    <div class="tv-article-content">
-                        <div class="tv-article-title">{{ content.title }}</div>
-                        <div class="tv-article-body">
-                            {{ content.content|raw }}
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        {% else %}
-            <div class="tv-empty-state">
-                Keine aktiven Inhalte verfügbar.
-            </div>
-        {% endfor %}
+        {{ slides|raw }}
     </div>
 {% endblock %}
