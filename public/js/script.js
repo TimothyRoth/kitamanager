@@ -148,8 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let knownSignature = viewport.dataset.contentSignature || null;
 
         const poll = async () => {
-            if (document.hidden) return; // skip while tab/screen is not visible
-
             try {
                 const response = await fetch(url, {
                     headers: {'X-Requested-With': 'XMLHttpRequest'},
@@ -180,6 +178,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         window.tvSliderRefreshTimer = setInterval(poll, intervalMs);
+
+        // Refresh immediately when the tab/screen becomes visible again, so a
+        // viewer returning to the slider (or a display waking from standby)
+        // doesn't keep showing stale content until the next interval tick.
+        if (window.tvSliderVisibilityHandler) {
+            document.removeEventListener('visibilitychange', window.tvSliderVisibilityHandler);
+        }
+        window.tvSliderVisibilityHandler = () => {
+            if (!document.hidden) {
+                poll();
+            }
+        };
+        document.addEventListener('visibilitychange', window.tvSliderVisibilityHandler);
     };
 
     // Initialize bulk-delete selection
