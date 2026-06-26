@@ -243,11 +243,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!target) return;
 
                 const apply = () => {
-                    target.style.display = input.checked ? 'none' : '';
+                    const display = input.checked ? 'none' : '';
+                    target.style.display = display;
+                    // Also hide a filter input rendered right before the list.
+                    const sibling = target.previousElementSibling;
+                    if (sibling && sibling.classList.contains('choice-filter')) {
+                        sibling.style.display = display;
+                    }
                 };
 
                 input.addEventListener('change', apply);
                 apply();
+            });
+        });
+    };
+
+    // Add a quick client-side filter above long choice lists (e.g. assigning
+    // a user to hundreds of others) so they stay usable at scale.
+    const initChoiceFilter = () => {
+        document.querySelectorAll('.choice-list').forEach(list => {
+            if (list.dataset.filterInitialized === 'true') return;
+
+            const items = Array.from(list.querySelectorAll('.form-check'));
+            if (items.length < 8) return;
+
+            list.dataset.filterInitialized = 'true';
+
+            const filter = document.createElement('input');
+            filter.type = 'search';
+            filter.className = 'choice-filter';
+            filter.placeholder = 'Liste filtern…';
+            filter.setAttribute('aria-label', 'Liste filtern');
+            list.parentNode.insertBefore(filter, list);
+
+            filter.addEventListener('input', () => {
+                const query = filter.value.trim().toLowerCase();
+                items.forEach(item => {
+                    const matches = item.textContent.trim().toLowerCase().includes(query);
+                    item.style.display = matches ? '' : 'none';
+                });
+            });
+        });
+    };
+
+    // Inline management actions (reorder / toggle) submit a real form and reload
+    // the page, which otherwise jumps back to the top. Remember the affected row
+    // and bring it back into view after the reload so the list "stays put".
+    const initScrollPreservation = () => {
+        const targetId = sessionStorage.getItem('km-scroll-target');
+        if (targetId) {
+            sessionStorage.removeItem('km-scroll-target');
+            const restore = () => {
+                const el = document.getElementById(targetId);
+                if (el) {
+                    el.scrollIntoView({block: 'center', behavior: 'instant'});
+                }
+            };
+            // Run after layout, and again after images finish loading (they can
+            // shift the layout and move the anchor).
+            requestAnimationFrame(restore);
+            window.addEventListener('load', restore, {once: true});
+        }
+
+        document.querySelectorAll('form[data-preserve-scroll]').forEach(form => {
+            if (form.dataset.scrollInit === 'true') return;
+            form.dataset.scrollInit = 'true';
+
+            form.addEventListener('submit', () => {
+                const row = form.closest('[id]');
+                if (row && row.id) {
+                    sessionStorage.setItem('km-scroll-target', row.id);
+                }
             });
         });
     };
@@ -483,7 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initBulkDelete();
     initImagePreview();
     initUploadProgress();
+    initChoiceFilter();
     initAllToggles();
+    initScrollPreservation();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
@@ -493,6 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
         initBulkDelete();
         initImagePreview();
         initUploadProgress();
+        initChoiceFilter();
         initAllToggles();
+        initScrollPreservation();
     });
 });

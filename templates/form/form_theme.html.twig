@@ -1,0 +1,16 @@
+{% extends 'form_div_layout.html.twig' %}
+
+{# Wrap each expanded choice (checkbox/radio) in its own .form-check so the list
+   can be laid out as a scrollable, multi-column grid that scales to hundreds of
+   entries. Also exposes a .choice-list hook on the container. #}
+{% block choice_widget_expanded -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' choice-list')|trim}) -%}
+    <div {{ block('widget_container_attributes') }}>
+        {%- for child in form -%}
+            <label class="form-check">
+                {{- form_widget(child) -}}
+                <span class="form-check-label">{{- child.vars.label -}}</span>
+            </label>
+        {%- endfor -%}
+    </div>
+{%- endblock %}

@@ -135,13 +135,25 @@ button.btn-link {
     background-color: transparent;
     border: none;
     padding: 0;
-    text-decoration: underline;
+    text-decoration: none;
     display: inline;
 }
 
 .btn-link:hover,
 button.btn-link:hover {
     color: var(--color-primary-hover);
+    text-decoration: underline;
+}
+
+/* Destructive link-style buttons (e.g. "Löschen") */
+.btn-link.text-danger,
+button.btn-link.text-danger {
+    color: var(--color-danger);
+}
+
+.btn-link.text-danger:hover,
+button.btn-link.text-danger:hover {
+    color: var(--color-danger-hover);
 }
 
 .btn-icon {
@@ -226,7 +238,10 @@ button.btn-link:hover {
 }
 
 .data-cell-label {
-    font-size: 0.875rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
     margin-bottom: var(--spacing-xs);
     display: block;
@@ -455,4 +470,141 @@ button.btn-link:hover {
 
 .upload-progress-error {
     margin-top: var(--spacing-md);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+.text-muted {
+    color: var(--color-text-muted);
+}
+
+.text-danger {
+    color: var(--color-danger);
+}
+
+/* Container for the slider reorder (up/down) buttons */
+.table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+/* Form help text (e.g. EntityType help on user assignment) */
+.help-text,
+.form-group .help-text {
+    margin: var(--spacing-xs) 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Expanded choice lists (assigned users / audience) – scale to 100s  */
+/* ------------------------------------------------------------------ */
+.choice-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: var(--spacing-xs) var(--spacing-md);
+    max-height: 16rem;
+    overflow-y: auto;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background-color: var(--color-surface);
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: 0;
+    padding: 0.2rem 0;
+    font-weight: 400;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.form-check input[type="checkbox"],
+.form-check input[type="radio"] {
+    width: auto;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.form-check-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Client-side filter injected above long choice lists */
+.choice-filter {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Data list – desktop polish                                         */
+/* ------------------------------------------------------------------ */
+@media (min-width: 768px) {
+    .data-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .data-row:not(.data-header):hover {
+        background-color: var(--color-bg);
+    }
+
+    .btn-icon {
+        min-width: 2rem;
+        min-height: 2rem;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Data list – mobile: consistent left-aligned stacked card          */
+/* ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+    .data-row {
+        gap: 0;
+    }
+
+    .data-row > .data-cell {
+        padding: var(--spacing-sm) 0;
+        text-align: left;
+        align-items: flex-start;
+    }
+
+    .data-row > .data-cell + .data-cell {
+        border-top: 1px solid var(--color-border);
+    }
+
+    /* Checkbox + actions share the same left alignment as every other cell */
+    .cell-checkbox {
+        justify-content: flex-start;
+    }
+
+    .cell-actions {
+        justify-content: flex-start;
+        gap: var(--spacing-md);
+    }
+
+    .btn-icon {
+        min-width: 2.5rem;
+        min-height: 2.5rem;
+    }
+
+    /* Stack action bars into full-width, thumb-friendly controls */
+    .actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .actions-bar > *,
+    .actions-bar .btn,
+    .actions-bar form,
+    .actions-bar form button {
+        width: 100%;
+    }
 }
