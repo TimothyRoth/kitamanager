@@ -377,13 +377,17 @@ button.btn-link.text-danger:hover {
     border-color: #fde68a;
 }
 
-/* PIN entry on the TV linking page: large and readable from a distance */
+/* PIN entry on the TV linking page: large and readable from a distance.
+   Margins instead of flex gap: old TV browser engines don't support gap. */
 .pin-form {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-md);
     margin-top: var(--spacing-md);
+}
+
+.pin-form > * {
+    margin-bottom: var(--spacing-md);
 }
 
 .pin-input {

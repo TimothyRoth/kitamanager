@@ -76,151 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // (Re)start the rotation interval for the slider, continuing from whichever
-    // slide is currently active so a background content refresh doesn't jump.
-    const startSliderRotation = (viewport) => {
-        if (window.tvSliderInterval) {
-            clearInterval(window.tvSliderInterval);
-        }
-
-        const slides = Array.from(viewport.querySelectorAll('.tv-slide'));
-        if (slides.length <= 1) return; // No need to rotate 0 or 1 item
-
-        const durationMs = parseInt(viewport.getAttribute('data-duration'), 10) || 10000;
-
-        let currentIndex = slides.findIndex(slide => slide.classList.contains('is-active'));
-        if (currentIndex < 0) {
-            currentIndex = 0;
-            slides[0].classList.add('is-active');
-        }
-
-        window.tvSliderInterval = setInterval(() => {
-            slides[currentIndex].classList.remove('is-active');
-            currentIndex = (currentIndex + 1) % slides.length;
-            slides[currentIndex].classList.add('is-active');
-        }, durationMs);
-    };
-
-    // Initialize TV Slider logic
-    const initTvSlider = () => {
-        const viewport = document.getElementById('tv-slider');
-        if (!viewport) return;
-
-        startSliderRotation(viewport);
-    };
-
-    // Seamlessly swap the slide set. The slide currently on screen is preserved
-    // (matched by its data-slide-key), so the viewer sees no flash when the
-    // content set changes; added/removed items just affect the ongoing rotation.
-    const applySlides = (viewport, html) => {
-        const currentActive = viewport.querySelector('.tv-slide.is-active');
-        const currentKey = currentActive ? currentActive.dataset.slideKey : null;
-
-        const temp = document.createElement('div');
-        temp.innerHTML = html;
-
-        const newSlides = Array.from(temp.querySelectorAll('.tv-slide'));
-        newSlides.forEach(slide => slide.classList.remove('is-active'));
-
-        if (newSlides.length > 0) {
-            let activeIndex = 0;
-            if (currentKey) {
-                const matchIndex = newSlides.findIndex(slide => slide.dataset.slideKey === currentKey);
-                if (matchIndex !== -1) {
-                    activeIndex = matchIndex;
-                }
-            }
-            newSlides[activeIndex].classList.add('is-active');
-        }
-
-        viewport.innerHTML = temp.innerHTML;
-        startSliderRotation(viewport);
-    };
-
-    // Poll the slider content endpoint and apply changes in the background.
-    const initSliderAutoRefresh = () => {
-        const viewport = document.getElementById('tv-slider');
-        if (!viewport) return;
-
-        const url = viewport.dataset.refreshUrl;
-        if (!url) return;
-
-        if (window.tvSliderRefreshTimer) {
-            clearInterval(window.tvSliderRefreshTimer);
-        }
-
-        const intervalMs = parseInt(viewport.dataset.refreshInterval, 10) || 30000;
-        let knownSignature = viewport.dataset.contentSignature || null;
-
-        const poll = async () => {
-            try {
-                const response = await fetch(url, {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    cache: 'no-store',
-                });
-                if (!response.ok) return;
-
-                const data = await response.json();
-                const newDuration = String(data.duration);
-                const durationChanged = newDuration !== viewport.getAttribute('data-duration');
-
-                if (data.signature === knownSignature) {
-                    // Content unchanged; only restart rotation if the duration changed.
-                    if (durationChanged) {
-                        viewport.setAttribute('data-duration', newDuration);
-                        startSliderRotation(viewport);
-                    }
-                    return;
-                }
-
-                knownSignature = data.signature;
-                viewport.dataset.contentSignature = data.signature;
-                viewport.setAttribute('data-duration', newDuration);
-                applySlides(viewport, data.html);
-            } catch (e) {
-                // Ignore transient network errors; the next poll will retry.
-            }
-        };
-
-        window.tvSliderRefreshTimer = setInterval(poll, intervalMs);
-
-        // Refresh immediately when the tab/screen becomes visible again, so a
-        // viewer returning to the slider (or a display waking from standby)
-        // doesn't keep showing stale content until the next interval tick.
-        if (window.tvSliderVisibilityHandler) {
-            document.removeEventListener('visibilitychange', window.tvSliderVisibilityHandler);
-        }
-        window.tvSliderVisibilityHandler = () => {
-            if (!document.hidden) {
-                poll();
-            }
-        };
-        document.addEventListener('visibilitychange', window.tvSliderVisibilityHandler);
-    };
-
-    // PIN entry on the TV linking page: submit as soon as the 4th digit is
-    // entered, so no separate confirm button is needed on the device.
-    const initPinAutoSubmit = () => {
-        document.querySelectorAll('input[data-pin-autosubmit]').forEach(input => {
-            if (input.dataset.pinAutosubmitInitialized === 'true') return;
-            input.dataset.pinAutosubmitInitialized = 'true';
-
-            input.addEventListener('input', () => {
-                if (!/^\d{4}$/.test(input.value.trim())) return;
-
-                const form = input.closest('form');
-                if (!form) return;
-
-                // requestSubmit keeps Turbo's form handling; older TV browsers
-                // fall back to a plain (full page) submission.
-                if (typeof form.requestSubmit === 'function') {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
-                }
-            });
-        });
-    };
+    // NOTE: The TV slider and PIN entry logic lives in tv.js (strictly ES5 for
+    // embedded TV browsers); the /slider/... pages load tv.js instead of this file.
 
     // Initialize bulk-delete selection
     const initBulkDelete = () => {
@@ -693,27 +550,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Run initializations
     initWysiwyg();
-    initTvSlider();
-    initSliderAutoRefresh();
     initBulkDelete();
     initImagePreview();
     initUploadProgress();
     initChoiceFilter();
     initAllToggles();
     initScrollPreservation();
-    initPinAutoSubmit();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
         initWysiwyg();
-        initTvSlider();
-        initSliderAutoRefresh();
         initBulkDelete();
         initImagePreview();
         initUploadProgress();
         initChoiceFilter();
         initAllToggles();
         initScrollPreservation();
-        initPinAutoSubmit();
     });
 });

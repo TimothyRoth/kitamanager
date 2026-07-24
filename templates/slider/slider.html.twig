@@ -2,6 +2,13 @@
 
 {% block title %}Slider{% endblock %}
 
+{# TV pages run on embedded TV browsers with old engines: load only the
+   ES5-safe tv.js and skip the modern script.js and Turbo (import maps). #}
+{% block app_javascripts %}
+    <script src="{{ asset('js/tv.js') }}" defer></script>
+{% endblock %}
+{% block importmap %}{% endblock %}
+
 {% block body %}
     <div class="tv-slider-viewport"
          data-duration="{{ user.durationBetweenSlides * 1000 }}"

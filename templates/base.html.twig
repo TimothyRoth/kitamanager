@@ -10,7 +10,9 @@
         {% block stylesheets %}
         {% endblock %}
 
-        <script src="{{ asset('js/script.js') }}" defer></script>
+        {% block app_javascripts %}
+            <script src="{{ asset('js/script.js') }}" defer></script>
+        {% endblock %}
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
