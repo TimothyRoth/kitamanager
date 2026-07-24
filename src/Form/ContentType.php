@@ -20,8 +20,10 @@ class ContentType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        // TVs cannot reliably render larger files, so each individual image is
+        // capped at 3MB. The total size of a bulk upload is not limited here.
         $imageConstraint = new Image([
-            'maxSize' => '10M',
+            'maxSize' => '3M',
             'maxSizeMessage' => 'Die Datei ist zu groß ({{ size }} {{ suffix }}). Erlaubt sind maximal {{ limit }} {{ suffix }}.',
             'mimeTypes' => [
                 'image/jpeg',

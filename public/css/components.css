@@ -371,6 +371,12 @@ button.btn-link.text-danger:hover {
     border-color: #fecaca;
 }
 
+.alert-warning {
+    color: #92400e;
+    background-color: #fef3c7;
+    border-color: #fde68a;
+}
+
 /* Forms inline */
 .form-inline {
     display: inline-block;
@@ -397,6 +403,51 @@ button.btn-link.text-danger:hover {
     object-fit: cover;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
+    display: block;
+}
+
+.image-preview-tile {
+    position: relative;
+}
+
+.image-preview-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: #1f2937;
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.image-preview-remove:hover {
+    background-color: #dc3545;
+}
+
+/* Marks preview images that exceed the per-image upload limit; these are
+   skipped on upload instead of blocking the whole batch. */
+.image-preview-tile.is-oversized img {
+    border: 3px solid #dc3545;
+    opacity: 0.5;
+}
+
+.image-preview-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 1px 8px;
+    border-radius: var(--border-radius);
+    background-color: #dc3545;
+    color: #fff;
+    font-size: 0.75rem;
+    white-space: nowrap;
 }
 
 /* Bulk-select checkbox cell */

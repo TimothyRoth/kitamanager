@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Slider auswählen{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="surface">
+            {% for message in app.flashes('danger') %}
+                <div class="alert alert-danger">{{ message }}</div>
+            {% endfor %}
+
+            <h1 class="h3 mb-3 font-weight-normal">Welcher Slider soll auf diesem Gerät angezeigt werden?</h1>
+
+            <p>
+                Die Auswahl wird auf diesem Gerät gespeichert. Beim nächsten Aufruf dieser Seite
+                startet der gewählte Slider automatisch, ohne erneute Nachfrage.
+            </p>
+
+            {% if kitas is empty %}
+                <div class="alert alert-danger">
+                    Es sind derzeit keine Kitas verfügbar.
+                </div>
+            {% else %}
+                <form method="post">
+                    <div class="form-group">
+                        <label for="display-slug">Kita</label>
+                        <select name="slug" id="display-slug" required autofocus>
+                            {% for kita in kitas %}
+                                <option value="{{ kita.slug }}" {{ kita.slug == currentSlug ? 'selected' }}>
+                                    {{ kita.username }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <input type="hidden" name="_token" value="{{ csrf_token('select-display') }}">
+
+                    <button class="btn btn-primary" type="submit">
+                        Slider starten
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

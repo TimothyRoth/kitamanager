@@ -171,7 +171,7 @@ final class ManagementController extends AbstractController
     public function createImage(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 10MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
+            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 3MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
 
             return $this->redirectToRoute('app_management_create_image');
         }
@@ -226,7 +226,7 @@ final class ManagementController extends AbstractController
     public function createArticle(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 10MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
+            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 3MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
 
             return $this->redirectToRoute('app_management_create_article');
         }
@@ -276,7 +276,7 @@ final class ManagementController extends AbstractController
         $this->denyAccessUnlessGranted('EDIT', $content);
 
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß und konnte nicht verarbeitet werden. Bitte laden Sie ein kleineres Bild hoch (max. 10MB).');
+            $this->addFlash('danger', 'Der Upload war zu groß und konnte nicht verarbeitet werden. Bitte laden Sie ein kleineres Bild hoch (max. 3MB).');
 
             return $this->redirectToRoute('app_management_edit_content', ['id' => $content->getId()]);
         }

@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Per-image upload limit (TVs cannot handle larger files). Matches the
+    // server-side "3M" constraint (Symfony uses 10^6 bytes per "M"). The
+    // total size of a bulk upload is deliberately not limited.
+    const MAX_IMAGE_BYTES = 3 * 1000 * 1000;
+
     // Add confirmation to specific forms
     const confirmForms = document.querySelectorAll('form[data-confirm]');
     confirmForms.forEach(form => {
@@ -318,7 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Initialize multi-image upload preview
+    // Initialize multi-image upload preview. Every selected image gets a
+    // removable tile; oversized images are flagged and will be skipped on
+    // upload (they never block the rest of the batch).
     const initImagePreview = () => {
         const inputs = document.querySelectorAll('.image-multi-upload');
 
@@ -330,20 +337,57 @@ document.addEventListener('DOMContentLoaded', () => {
             preview.className = 'image-preview-grid';
             input.parentNode.insertBefore(preview, input.nextSibling);
 
-            input.addEventListener('change', () => {
+            // File inputs are read-only per file, so removing a single file
+            // means rebuilding the FileList without it.
+            const removeFileAt = (index) => {
+                const transfer = new DataTransfer();
+                Array.from(input.files).forEach((file, i) => {
+                    if (i !== index) transfer.items.add(file);
+                });
+                input.files = transfer.files;
+                renderPreview();
+            };
+
+            const renderPreview = () => {
                 // Release any previously created object URLs to avoid leaks.
                 preview.querySelectorAll('img').forEach(img => URL.revokeObjectURL(img.src));
                 preview.innerHTML = '';
 
-                Array.from(input.files).forEach(file => {
+                Array.from(input.files).forEach((file, index) => {
                     if (!file.type.startsWith('image/')) return;
+
+                    const tile = document.createElement('div');
+                    tile.className = 'image-preview-tile';
 
                     const img = document.createElement('img');
                     img.className = 'thumbnail';
                     img.src = URL.createObjectURL(file);
-                    preview.appendChild(img);
+                    tile.appendChild(img);
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'image-preview-remove';
+                    removeButton.innerHTML = '&times;';
+                    removeButton.title = `${file.name} entfernen`;
+                    removeButton.setAttribute('aria-label', `${file.name} entfernen`);
+                    removeButton.addEventListener('click', () => removeFileAt(index));
+                    tile.appendChild(removeButton);
+
+                    if (file.size > MAX_IMAGE_BYTES) {
+                        tile.classList.add('is-oversized');
+                        tile.title = `${file.name} ist größer als 3 MB und wird nicht hochgeladen`;
+
+                        const badge = document.createElement('span');
+                        badge.className = 'image-preview-badge';
+                        badge.textContent = 'zu groß';
+                        tile.appendChild(badge);
+                    }
+
+                    preview.appendChild(tile);
                 });
-            });
+            };
+
+            input.addEventListener('change', renderPreview);
         });
     };
 
@@ -414,6 +458,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Non-blocking notice (e.g. "oversized images were skipped") that stays
+    // visible while the remaining images upload.
+    const showUploadSkipNotice = (form, message) => {
+        form.querySelector('.upload-skip-notice')?.remove();
+
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-warning upload-skip-notice';
+        alert.textContent = message;
+
+        const progress = form.querySelector('.upload-progress');
+        if (progress) {
+            progress.insertAdjacentElement('afterend', alert);
+        } else {
+            form.appendChild(alert);
+        }
+    };
+
     const initUploadProgress = () => {
         document.querySelectorAll('form[data-upload-with-progress]').forEach(form => {
             if (form.dataset.uploadProgressInitialized === 'true') {
@@ -443,6 +504,70 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 event.preventDefault();
+
+                form.querySelector('.upload-skip-notice')?.remove();
+
+                // Oversized images never block the batch: they are removed
+                // from multi-upload inputs and the remaining images are
+                // uploaded. Single-file inputs (article/edit forms) cannot be
+                // partially submitted, so there an oversized image stops the
+                // submit with an error instead. The inputs are only mutated
+                // once it is certain the upload proceeds, so a fully oversized
+                // selection keeps its preview and can still be corrected.
+                const fileInputs = Array.from(form.querySelectorAll('input[type="file"]'));
+                const skippedNames = [];
+                const filterPlans = [];
+                let oversizedSingleFile = false;
+                let remainingCount = 0;
+
+                fileInputs.forEach(input => {
+                    const files = Array.from(input.files || []);
+                    const oversized = files.filter(file => file.size > MAX_IMAGE_BYTES);
+
+                    if (oversized.length > 0 && !input.multiple) {
+                        oversizedSingleFile = true;
+                        return;
+                    }
+
+                    const keep = files.filter(file => file.size <= MAX_IMAGE_BYTES);
+                    remainingCount += keep.length;
+
+                    if (oversized.length > 0) {
+                        filterPlans.push({input, keep});
+                        skippedNames.push(...oversized.map(file => file.name));
+                    }
+                });
+
+                if (oversizedSingleFile) {
+                    showUploadProgressError(
+                        form,
+                        'Das ausgewählte Bild ist größer als 3 MB und kann nicht hochgeladen werden. Bitte verkleinern Sie es.'
+                    );
+                    return;
+                }
+
+                if (remainingCount === 0) {
+                    showUploadProgressError(
+                        form,
+                        'Alle ausgewählten Bilder sind größer als 3 MB und können daher nicht hochgeladen werden. Bitte verkleinern Sie die Bilder (max. 3 MB pro Bild).'
+                    );
+                    return;
+                }
+
+                filterPlans.forEach(({input, keep}) => {
+                    const transfer = new DataTransfer();
+                    keep.forEach(file => transfer.items.add(file));
+                    input.files = transfer.files;
+                    // Keep the preview tiles in sync with the filtered selection.
+                    input.dispatchEvent(new Event('change'));
+                });
+
+                if (skippedNames.length > 0) {
+                    showUploadSkipNotice(
+                        form,
+                        `${skippedNames.length} Bild(er) über 3 MB werden übersprungen: ${skippedNames.join(', ')}. Die übrigen Bilder werden hochgeladen.`
+                    );
+                }
 
                 syncWysiwygFields(form);
 
@@ -484,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (xhr.status === 413) {
                         showUploadProgressError(
                             form,
-                            'Der Upload war zu groß. Bitte kleinere Dateien wählen (max. 10 MB pro Bild).'
+                            'Der Upload war zu groß. Bitte kleinere Dateien wählen (max. 3 MB pro Bild).'
                         );
                         return;
                     }
