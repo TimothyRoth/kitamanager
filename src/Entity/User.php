@@ -36,6 +36,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private int $durationBetweenSlides = 10;
 
     /**
+     * 4-digit PIN the user defines in their panel. Display devices (TVs)
+     * enter it once on /slider/display to link themselves to this user's
+     * slider. Unique across all users so a PIN maps to exactly one kita;
+     * multiple TVs of the same kita may share it.
+     */
+    #[ORM\Column(length: 4, unique: true, nullable: true)]
+    private ?string $devicePin = null;
+
+    /**
      * Content created (owned) by this user.
      *
      * @var Collection<int, Content>
@@ -160,6 +169,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getSlug(): ?string
     {
         return $this->slug;
+    }
+
+    public function getDevicePin(): ?string
+    {
+        return $this->devicePin;
+    }
+
+    public function setDevicePin(?string $devicePin): static
+    {
+        $devicePin = $devicePin !== null ? trim($devicePin) : null;
+        $this->devicePin = $devicePin === '' ? null : $devicePin;
+
+        return $this;
     }
 
     public function getDurationBetweenSlides(): int

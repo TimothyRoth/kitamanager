@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Form\ChangePasswordType;
 use App\Form\ContentType as ContentFormType;
 use App\Enum\ContentType as eContentType;
+use App\Form\UserDevicePinType;
 use App\Form\UserDurationType;
 use App\Form\UserType;
 use App\Repository\ContentRepository;
@@ -92,6 +93,22 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_user');
         }
 
+        $devicePinForm = $this->createForm(UserDevicePinType::class, $user);
+        $devicePinForm->handleRequest($request);
+
+        if ($devicePinForm->isSubmitted() && $devicePinForm->isValid()) {
+            try {
+                $entityManager->flush();
+                $this->addFlash('success', $user->getDevicePin()
+                    ? 'Die Fernseher-PIN wurde gespeichert. Geben Sie sie jetzt auf dem Fernseher ein.'
+                    : 'Die Fernseher-PIN wurde entfernt. Verbundene Fernseher verlieren ihre Zuordnung.');
+            } catch (UniqueConstraintViolationException $e) {
+                $this->addFlash('danger', 'Diese PIN ist bereits vergeben – bitte wählen Sie eine andere.');
+            }
+
+            return $this->redirectToRoute('app_management_user');
+        }
+
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
@@ -103,12 +120,19 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_user');
         }
 
+        // 422 when a submitted form is invalid, otherwise Turbo would not
+        // render the response and validation errors would never show up.
+        $formInvalid = ($durationForm->isSubmitted() && !$durationForm->isValid())
+            || ($devicePinForm->isSubmitted() && !$devicePinForm->isValid())
+            || ($passwordForm->isSubmitted() && !$passwordForm->isValid());
+
         return $this->render('management/user.html.twig', [
             'contents' => $contentRepository->findByCreator($user),
             'sliderItems' => $sliderItemRepository->findAllForConsumer($user),
             'durationForm' => $durationForm->createView(),
+            'devicePinForm' => $devicePinForm->createView(),
             'passwordForm' => $passwordForm->createView(),
-        ]);
+        ], new Response(null, $formInvalid ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
     #[Route('/admin/edit-user/{id}', name: 'app_management_edit_user')]

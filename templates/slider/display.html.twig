@@ -1,45 +1,40 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Slider auswählen{% endblock %}
+{% block title %}PIN eingeben{% endblock %}
 
 {% block body %}
     <div class="container">
-        <div class="surface">
-            {% for message in app.flashes('danger') %}
-                <div class="alert alert-danger">{{ message }}</div>
-            {% endfor %}
+        <div class="surface" style="text-align: center;">
+            <h1>Slider mit einer Kita verbinden</h1>
 
-            <h1 class="h3 mb-3 font-weight-normal">Welcher Slider soll auf diesem Gerät angezeigt werden?</h1>
+            {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
 
             <p>
-                Die Auswahl wird auf diesem Gerät gespeichert. Beim nächsten Aufruf dieser Seite
-                startet der gewählte Slider automatisch, ohne erneute Nachfrage.
+                Geben Sie die 4-stellige PIN ein, die in den Einstellungen der
+                gewünschten Kita hinterlegt wurde. Dieses Gerät merkt sich die
+                Verbindung und startet den Slider künftig automatisch.
             </p>
 
-            {% if kitas is empty %}
-                <div class="alert alert-danger">
-                    Es sind derzeit keine Kitas verfügbar.
-                </div>
-            {% else %}
-                <form method="post">
-                    <div class="form-group">
-                        <label for="display-slug">Kita</label>
-                        <select name="slug" id="display-slug" required autofocus>
-                            {% for kita in kitas %}
-                                <option value="{{ kita.slug }}" {{ kita.slug == currentSlug ? 'selected' }}>
-                                    {{ kita.username }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
+            <form method="post" class="pin-form">
+                <label for="display-pin" class="sr-only">PIN</label>
+                <input type="text" name="pin" id="display-pin" class="pin-input"
+                       inputmode="numeric" pattern="\d{4}" maxlength="4"
+                       placeholder="0000" autocomplete="off" required autofocus
+                       data-pin-autosubmit>
 
-                    <input type="hidden" name="_token" value="{{ csrf_token('select-display') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('display-pin') }}">
 
-                    <button class="btn btn-primary" type="submit">
-                        Slider starten
-                    </button>
-                </form>
-            {% endif %}
+                {# No visible CTA: the device's own confirm key (OK/Enter) submits
+                   the form; entering the 4th digit submits automatically. #}
+                <button class="sr-only" type="submit">Slider starten</button>
+
+                <p style="color: #6b7280;">
+                    Die Verbindung startet automatisch nach der 4. Ziffer –
+                    alternativ mit der OK-/Enter-Taste bestätigen.
+                </p>
+            </form>
         </div>
     </div>
 {% endblock %}

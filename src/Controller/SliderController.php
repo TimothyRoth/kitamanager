@@ -15,54 +15,56 @@ use Symfony\Component\Routing\Attribute\Route;
 final class SliderController extends AbstractController
 {
     /**
-     * Cookie that remembers which kita a display device (TV) should show,
-     * so the device is not asked again on every restart.
+     * Cookie holding the PIN a TV was linked with. Browsers cap cookie
+     * lifetimes (~400 days), so it is re-issued on every visit, which makes
+     * it effectively permanent on a regularly running device.
      */
-    private const DISPLAY_COOKIE = 'kitamanager_display_slug';
+    private const PIN_COOKIE = 'kitamanager_display_pin';
 
     /**
-     * Entry point for TVs: remembers the selected kita in a cookie and then
-     * always forwards to that kita's slider. Without a (valid) cookie a
-     * one-time selection dropdown is shown. Append ?change=1 to pick a
-     * different kita on a device that already has one stored.
+     * Entry point for TVs: each user defines a unique 4-digit PIN in their
+     * panel; the TV enters it once here and is linked via a cookie. When the
+     * PIN no longer resolves (user changed or removed it), the device is
+     * asked to enter the current PIN again.
      *
      * NOTE: must be declared before the /slider/{slug?} route so that
      * "display" is not interpreted as a slug.
      */
-    #[Route('/slider/display', name: 'app_slider_display')]
+    #[Route('/slider/display', name: 'app_slider_display', methods: ['GET', 'POST'])]
     public function display(Request $request, UserRepository $userRepository): Response
     {
         if ($request->isMethod('POST')) {
-            $slug = (string) $request->request->get('slug');
-            $user = $this->isCsrfTokenValid('select-display', $request->request->get('_token'))
-                ? $userRepository->findOneBy(['slug' => $slug])
+            $pin = trim((string) $request->request->get('pin'));
+            $user = $this->isCsrfTokenValid('display-pin', $request->request->get('_token'))
+                ? $userRepository->findOneBy(['devicePin' => $pin])
                 : null;
 
             if ($user) {
-                return $this->redirectToSliderWithCookie($user);
+                return $this->redirectToSliderWithPinCookie($user, $pin);
             }
 
-            $this->addFlash('danger', 'Die Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
-
-            return $this->redirectToRoute('app_slider_display');
+            // 422 so Turbo renders the error response of the form submission.
+            return $this->render('slider/display.html.twig', [
+                'error' => 'Diese PIN ist keiner Kita zugeordnet. Bitte prüfen Sie die Eingabe und versuchen Sie es erneut.',
+            ], new Response(null, Response::HTTP_UNPROCESSABLE_ENTITY));
         }
 
-        $cookieSlug = $request->cookies->get(self::DISPLAY_COOKIE);
+        $cookiePin = $request->cookies->get(self::PIN_COOKIE);
 
-        if ($cookieSlug && !$request->query->getBoolean('change')) {
-            $user = $userRepository->findOneBy(['slug' => $cookieSlug]);
+        if ($cookiePin) {
+            $user = $userRepository->findOneBy(['devicePin' => $cookiePin]);
 
             if ($user) {
-                // Re-setting the cookie keeps it from ever expiring on a TV
-                // that regularly opens this route.
-                return $this->redirectToSliderWithCookie($user);
+                return $this->redirectToSliderWithPinCookie($user, $cookiePin);
             }
-            // Stale cookie (kita deleted/renamed): fall through to the dropdown.
+
+            return $this->render('slider/display.html.twig', [
+                'error' => 'Ihrer PIN konnte kein Slider zugewiesen werden. Bitte geben Sie die aktuelle PIN erneut ein.',
+            ]);
         }
 
         return $this->render('slider/display.html.twig', [
-            'kitas' => $userRepository->getUsersByRole('ROLE_USER'),
-            'currentSlug' => $cookieSlug,
+            'error' => null,
         ]);
     }
 
@@ -107,12 +109,12 @@ final class SliderController extends AbstractController
         ]);
     }
 
-    private function redirectToSliderWithCookie(User $user): Response
+    private function redirectToSliderWithPinCookie(User $user, string $pin): Response
     {
         $response = $this->redirectToRoute('app_slider', ['slug' => $user->getSlug()]);
         $response->headers->setCookie(
-            Cookie::create(self::DISPLAY_COOKIE, $user->getSlug())
-                ->withExpires(new \DateTimeImmutable('+1 year'))
+            Cookie::create(self::PIN_COOKIE, $pin)
+                ->withExpires(new \DateTimeImmutable('+400 days'))
                 ->withPath('/')
                 ->withHttpOnly(true)
                 ->withSameSite(Cookie::SAMESITE_LAX)

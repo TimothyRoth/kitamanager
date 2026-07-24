@@ -198,6 +198,30 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('visibilitychange', window.tvSliderVisibilityHandler);
     };
 
+    // PIN entry on the TV linking page: submit as soon as the 4th digit is
+    // entered, so no separate confirm button is needed on the device.
+    const initPinAutoSubmit = () => {
+        document.querySelectorAll('input[data-pin-autosubmit]').forEach(input => {
+            if (input.dataset.pinAutosubmitInitialized === 'true') return;
+            input.dataset.pinAutosubmitInitialized = 'true';
+
+            input.addEventListener('input', () => {
+                if (!/^\d{4}$/.test(input.value.trim())) return;
+
+                const form = input.closest('form');
+                if (!form) return;
+
+                // requestSubmit keeps Turbo's form handling; older TV browsers
+                // fall back to a plain (full page) submission.
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        });
+    };
+
     // Initialize bulk-delete selection
     const initBulkDelete = () => {
         const submitButton = document.querySelector('[data-bulk-submit]');
@@ -677,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChoiceFilter();
     initAllToggles();
     initScrollPreservation();
+    initPinAutoSubmit();
 
     // Re-initialize on Turbo render if applicable
     document.addEventListener('turbo:render', () => {
@@ -689,5 +714,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initChoiceFilter();
         initAllToggles();
         initScrollPreservation();
+        initPinAutoSubmit();
     });
 });
