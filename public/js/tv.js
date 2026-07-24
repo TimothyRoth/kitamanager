@@ -144,6 +144,13 @@
                         return;
                     }
 
+                    // The device's PIN no longer belongs to this slider
+                    // (admin changed or removed it): go back to the PIN page.
+                    if (data.unlinked) {
+                        window.location.href = viewport.getAttribute('data-display-url') || '/slider/display';
+                        return;
+                    }
+
                     var newDuration = String(data.duration);
                     var durationChanged = newDuration !== viewport.getAttribute('data-duration');
 

@@ -15,6 +15,7 @@
          data-refresh-url="{{ path('app_slider_content', {'slug': user.slug}) }}"
          data-refresh-interval="30000"
          data-content-signature="{{ signature }}"
+         data-display-url="{{ path('app_slider_display') }}"
          id="tv-slider">
         {{ slides|raw }}
     </div>

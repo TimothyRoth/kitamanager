@@ -95,10 +95,25 @@ final class SliderController extends AbstractController
      * background. Returns a signature so the client can swap slides only when
      * something actually changed (new/edited/removed/reordered content or a
      * changed slide duration).
+     *
+     * Devices linked via PIN (recognisable by their cookie) are re-validated
+     * on every poll: when the PIN no longer belongs to the displayed user
+     * (admin changed or removed it), the device is sent back to the PIN page
+     * within one poll interval.
      */
     #[Route('/slider/{slug}/content', name: 'app_slider_content', methods: ['GET'])]
-    public function content(User $user, SliderItemRepository $sliderItemRepository): JsonResponse
+    public function content(User $user, Request $request, SliderItemRepository $sliderItemRepository, UserRepository $userRepository): JsonResponse
     {
+        $cookiePin = $request->cookies->get(self::PIN_COOKIE);
+
+        if (null !== $cookiePin) {
+            $pinUser = $userRepository->findOneBy(['devicePin' => $cookiePin]);
+
+            if (!$pinUser || $pinUser->getId() !== $user->getId()) {
+                return new JsonResponse(['unlinked' => true]);
+            }
+        }
+
         $items = $sliderItemRepository->findEnabledForConsumer($user);
         $slides = $this->renderView('slider/_slides.html.twig', ['items' => $items]);
 
