@@ -93,22 +93,6 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_user');
         }
 
-        $devicePinForm = $this->createForm(UserDevicePinType::class, $user);
-        $devicePinForm->handleRequest($request);
-
-        if ($devicePinForm->isSubmitted() && $devicePinForm->isValid()) {
-            try {
-                $entityManager->flush();
-                $this->addFlash('success', $user->getDevicePin()
-                    ? 'Die Fernseher-PIN wurde gespeichert. Geben Sie sie jetzt auf dem Fernseher ein.'
-                    : 'Die Fernseher-PIN wurde entfernt. Verbundene Fernseher verlieren ihre Zuordnung.');
-            } catch (UniqueConstraintViolationException $e) {
-                $this->addFlash('danger', 'Diese PIN ist bereits vergeben – bitte wählen Sie eine andere.');
-            }
-
-            return $this->redirectToRoute('app_management_user');
-        }
-
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
@@ -123,14 +107,12 @@ final class ManagementController extends AbstractController
         // 422 when a submitted form is invalid, otherwise Turbo would not
         // render the response and validation errors would never show up.
         $formInvalid = ($durationForm->isSubmitted() && !$durationForm->isValid())
-            || ($devicePinForm->isSubmitted() && !$devicePinForm->isValid())
             || ($passwordForm->isSubmitted() && !$passwordForm->isValid());
 
         return $this->render('management/user.html.twig', [
             'contents' => $contentRepository->findByCreator($user),
             'sliderItems' => $sliderItemRepository->findAllForConsumer($user),
             'durationForm' => $durationForm->createView(),
-            'devicePinForm' => $devicePinForm->createView(),
             'passwordForm' => $passwordForm->createView(),
         ], new Response(null, $formInvalid ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
@@ -142,6 +124,22 @@ final class ManagementController extends AbstractController
         // Capture the allowed targets before the form changes them, so we can
         // retract content for targets that get removed.
         $oldAllowedIds = $audienceSynchronizer->resolveAllowedTargetIds($user);
+
+        $devicePinForm = $this->createForm(UserDevicePinType::class, $user);
+        $devicePinForm->handleRequest($request);
+
+        if ($devicePinForm->isSubmitted() && $devicePinForm->isValid()) {
+            try {
+                $entityManager->flush();
+                $this->addFlash('success', $user->getDevicePin()
+                    ? 'Die Fernseher-PIN wurde gespeichert. Geben Sie sie jetzt auf dem Fernseher ein.'
+                    : 'Die Fernseher-PIN wurde entfernt. Verbundene Fernseher verlieren ihre Zuordnung.');
+            } catch (UniqueConstraintViolationException $e) {
+                $this->addFlash('danger', 'Diese PIN ist bereits vergeben – bitte wählen Sie eine andere.');
+            }
+
+            return $this->redirectToRoute('app_management_edit_user', ['id' => $user->getId()]);
+        }
 
         $form = $this->createForm(UserType::class, $user, ['is_new' => false, 'current_user_id' => $user->getId()]);
         $form->handleRequest($request);
@@ -166,14 +164,14 @@ final class ManagementController extends AbstractController
             }
         }
 
-        $status = $form->isSubmitted() && !$form->isValid()
-            ? Response::HTTP_UNPROCESSABLE_ENTITY
-            : Response::HTTP_OK;
+        $formInvalid = ($form->isSubmitted() && !$form->isValid())
+            || ($devicePinForm->isSubmitted() && !$devicePinForm->isValid());
 
         return $this->render('management/edit_user.html.twig', [
             'user' => $user,
             'form' => $form->createView(),
-        ], new Response(null, $status));
+            'devicePinForm' => $devicePinForm->createView(),
+        ], new Response(null, $formInvalid ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
     #[Route('/admin/delete-user/{id}', name: 'app_management_delete_user', methods: ['POST'])]

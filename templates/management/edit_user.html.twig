@@ -4,6 +4,14 @@
 
 {% block body %}
     <div class="container">
+        {% for label, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="alert alert-{{ label }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endfor %}
+
         <div class="surface">
             <h1>In Bearbeitung: {{ user.username }}</h1>
 
@@ -22,10 +30,26 @@
             </div>
             <button type="submit" class="btn btn-primary">Änderungen speichern</button>
             {{ form_end(form) }}
+        </div>
 
-            <div style="margin-top: var(--spacing-md);">
-                <a href="{{ path('app_management_admin') }}" class="btn btn-link">Zurück zum Dashboard</a>
+        <div class="surface" style="margin-top: var(--spacing-xl);">
+            <h2>Fernseher zuordnen</h2>
+            <p>
+                Legen Sie hier eine 4-stellige PIN für diesen Benutzer fest. Die PIN wird
+                einmalig auf dem Fernseher unter <code>/slider/display</code> eingegeben –
+                der Fernseher merkt sich die Verbindung und zeigt dann automatisch den
+                Slider dieses Benutzers an. Mehrere Fernseher können dieselbe PIN verwenden.
+            </p>
+            {{ form_start(devicePinForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
+            <div class="form-group">
+                {{ form_row(devicePinForm.devicePin) }}
             </div>
+            <button type="submit" class="btn btn-primary">PIN speichern</button>
+            {{ form_end(devicePinForm) }}
+        </div>
+
+        <div class="surface" style="margin-top: var(--spacing-md);">
+            <a href="{{ path('app_management_admin') }}" class="btn btn-link">Zurück zum Dashboard</a>
         </div>
     </div>
 {% endblock %}

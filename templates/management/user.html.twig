@@ -28,22 +28,6 @@
         </div>
 
         <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Fernseher zuordnen</h2>
-            <p>
-                Legen Sie hier eine 4-stellige PIN fest und geben Sie diese einmalig
-                auf dem Fernseher unter <code>/slider/display</code> ein. Der Fernseher
-                merkt sich die Verbindung und zeigt dann automatisch Ihren Slider an.
-                Mehrere Fernseher können dieselbe PIN verwenden.
-            </p>
-            {{ form_start(devicePinForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
-            <div class="form-group">
-                {{ form_row(devicePinForm.devicePin) }}
-            </div>
-            <button type="submit" class="btn btn-primary">PIN speichern</button>
-            {{ form_end(devicePinForm) }}
-        </div>
-
-        <div class="surface" style="margin-top: var(--spacing-xl);">
             <h2>Passwort ändern</h2>
             {{ form_start(passwordForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
             <div class="form-group">

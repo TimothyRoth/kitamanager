@@ -29,7 +29,7 @@ class UserDevicePinType extends AbstractType
                     'inputmode' => 'numeric',
                     'autocomplete' => 'off',
                 ],
-                'help' => 'Diese PIN geben Sie einmalig auf dem Fernseher unter /slider/display ein. Wird die PIN geändert oder entfernt, verlieren alle damit verbundenen Fernseher die Zuordnung. Feld leer lassen, um die PIN zu entfernen.',
+                'help' => 'Die PIN wird einmalig auf dem Fernseher unter /slider/display eingegeben. Wird sie geändert oder entfernt, verlieren alle damit verbundenen Fernseher die Zuordnung. Feld leer lassen, um die PIN zu entfernen.',
             ]);
     }
 
