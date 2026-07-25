@@ -442,6 +442,13 @@ button.btn-link.text-danger:hover {
 
 .image-preview-tile {
     position: relative;
+    max-width: 120px;
+}
+
+/* Thumbnail + overlay badge; keeps the badge on the image, not on the status. */
+.image-preview-media {
+    position: relative;
+    display: inline-block;
 }
 
 .image-preview-remove {
@@ -458,19 +465,15 @@ button.btn-link.text-danger:hover {
     font-size: 16px;
     line-height: 1;
     cursor: pointer;
+    z-index: 1;
 }
 
 .image-preview-remove:hover {
     background-color: #dc3545;
 }
 
-/* Marks preview images that exceed the per-image upload limit; these are
-   skipped on upload instead of blocking the whole batch. */
-.image-preview-tile.is-oversized img {
-    border: 3px solid #dc3545;
-    opacity: 0.5;
-}
-
+/* Neutral hint on preview images above the stored limit: they are uploaded
+   normally and downscaled on the server. Anchored to the image, not the tile. */
 .image-preview-badge {
     position: absolute;
     bottom: 4px;
@@ -478,10 +481,57 @@ button.btn-link.text-danger:hover {
     transform: translateX(-50%);
     padding: 1px 8px;
     border-radius: var(--border-radius);
-    background-color: #dc3545;
+    background-color: #1f2937;
     color: #fff;
     font-size: 0.75rem;
     white-space: nowrap;
+}
+
+/* Originals above the hard cap cannot be uploaded at all. */
+.image-preview-badge.is-error {
+    background-color: #dc3545;
+}
+
+/* Hide the static pre-upload badge while a live upload state is active, so
+   e.g. "wird verkleinert" never sits on top of progress or error text. */
+.image-preview-tile.is-uploading .image-preview-badge,
+.image-preview-tile.is-done .image-preview-badge,
+.image-preview-tile.is-failed .image-preview-badge,
+.image-preview-tile:has(.image-preview-status) .image-preview-badge {
+    display: none;
+}
+
+.image-preview-tile.is-rejected img,
+.image-preview-tile.is-failed img {
+    border: 3px solid #dc3545;
+    opacity: 0.5;
+}
+
+.image-preview-tile.is-done img {
+    border: 3px solid var(--color-success);
+}
+
+.image-preview-tile.is-uploading img {
+    opacity: 0.7;
+}
+
+/* Per-image status line during the sequential bulk upload. */
+.image-preview-status {
+    display: block;
+    max-width: 120px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--color-text-muted);
+    word-break: break-word;
+}
+
+.image-preview-tile.is-done .image-preview-status {
+    color: var(--color-success);
+}
+
+.image-preview-tile.is-failed .image-preview-status {
+    color: #dc3545;
 }
 
 /* Bulk-select checkbox cell */

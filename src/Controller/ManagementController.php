@@ -15,6 +15,8 @@ use App\Repository\ContentRepository;
 use App\Repository\SliderItemRepository;
 use App\Repository\UserRepository;
 use App\Service\AudienceSynchronizer;
+use App\Service\ImageDownscaleException;
+use App\Service\ImageDownscaler;
 use App\Service\ImageUploader;
 use App\Service\UserPasswordUpdater;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -23,6 +25,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -190,10 +193,10 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-image', name: 'app_management_create_image')]
-    public function createImage(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
+    public function createImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 3MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
+            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB pro Bild – bitte laden Sie weniger Bilder gleichzeitig hoch.');
 
             return $this->redirectToRoute('app_management_create_image');
         }
@@ -217,7 +220,18 @@ final class ManagementController extends AbstractController
             ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
 
             $created = [];
+            $failed = [];
             foreach ($imageFiles as $imageFile) {
+                // No-JS fallback path: downscale oversized images here as well.
+                if ($imageDownscaler->needsDownscale($imageFile->getPathname())) {
+                    try {
+                        $imageDownscaler->downscale($imageFile->getPathname());
+                    } catch (ImageDownscaleException $e) {
+                        $failed[] = $imageFile->getClientOriginalName() . ': ' . $e->getMessage();
+                        continue;
+                    }
+                }
+
                 $image = new Content();
                 $image->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
                 $image->setType(eContentType::IMAGE);
@@ -233,9 +247,17 @@ final class ManagementController extends AbstractController
             }
             $entityManager->flush();
 
-            $this->addFlash('success', sprintf('%d Bild(er) erfolgreich hochgeladen!', count($imageFiles)));
+            foreach ($failed as $failure) {
+                $this->addFlash('danger', $failure);
+            }
 
-            return $this->redirectToRoute('app_management_user');
+            if ($created) {
+                $this->addFlash('success', sprintf('%d Bild(er) erfolgreich hochgeladen!', count($created)));
+
+                return $this->redirectToRoute('app_management_user');
+            }
+
+            return $this->redirectToRoute('app_management_create_image');
         }
 
         return $this->render('management/create_content.html.twig', [
@@ -244,11 +266,116 @@ final class ManagementController extends AbstractController
         ]);
     }
 
+    /**
+     * AJAX endpoint of the bulk upload: receives exactly ONE image per request.
+     * Processing images one at a time (instead of the whole batch in a single
+     * POST) is what keeps memory usage flat and prevents server OOM. Oversized
+     * images are downscaled to the TV limit instead of being rejected.
+     */
+    #[Route('/user/upload-image', name: 'app_management_upload_image', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function uploadImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): JsonResponse
+    {
+        // Body exceeded post_max_size: PHP dropped the whole request payload.
+        if ($this->isTruncatedUpload($request)) {
+            return $this->uploadError('Das Bild ist zu groß. Erlaubt sind maximal 25 MB pro Bild.');
+        }
+
+        if (!$this->isCsrfTokenValid('upload-image', $request->request->getString('_token'))) {
+            return $this->uploadError('Ungültiger CSRF-Token. Bitte laden Sie die Seite neu.');
+        }
+
+        $file = $request->files->get('image');
+        if (!$file instanceof UploadedFile) {
+            return $this->uploadError('Das Bild konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut.');
+        }
+
+        if (!$file->isValid()) {
+            // PHP rejected the file before our app code ran (e.g. upload_max_filesize).
+            if (in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                return $this->uploadError('Das Bild ist zu groß. Erlaubt sind maximal 25 MB pro Bild.');
+            }
+
+            return $this->uploadError('Das Bild konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut.');
+        }
+
+        if ($file->getSize() > ImageDownscaler::MAX_ORIGINAL_BYTES) {
+            return $this->uploadError(sprintf(
+                'Das Bild ist zu groß (%.1f MB). Erlaubt sind maximal 25 MB pro Bild.',
+                $file->getSize() / 1_000_000
+            ));
+        }
+
+        if (!in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/gif'], true)) {
+            return $this->uploadError('Bitte laden Sie ein gültiges Bild hoch (JPEG, PNG, GIF).');
+        }
+
+        $downscaled = false;
+        if ($imageDownscaler->needsDownscale($file->getPathname())) {
+            try {
+                $imageDownscaler->downscale($file->getPathname());
+                $downscaled = true;
+            } catch (ImageDownscaleException $e) {
+                return $this->uploadError($e->getMessage());
+            }
+        }
+
+        /** @var User $creator */
+        $creator = $this->getUser();
+
+        $audienceAll = $request->request->getBoolean('audienceAll');
+        $audienceIds = array_map('intval', $request->request->all('audience'));
+
+        try {
+            $image = new Content();
+            $image->setImageUrl($imageUploader->upload($file, $creator->getId()));
+            $image->setType(eContentType::IMAGE);
+            $image->setCreator($creator);
+            $entityManager->persist($image);
+            $entityManager->flush();
+
+            // Invalid/forbidden audience ids are filtered inside the synchronizer.
+            $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
+            $entityManager->flush();
+        } catch (\Exception $e) {
+            return $this->uploadError('Beim Speichern des Bildes gab es einen unerwarteten Fehler.', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json(['ok' => true, 'downscaled' => $downscaled]);
+    }
+
+    private function uploadError(string $message, int $status = Response::HTTP_UNPROCESSABLE_ENTITY): JsonResponse
+    {
+        return $this->json(['ok' => false, 'error' => $message], $status);
+    }
+
+    /**
+     * Downscale an oversized upload in place before it gets stored. On failure
+     * the user-facing message is attached to the form's imageFile field.
+     * Returns true when the file is ready to be stored.
+     */
+    private function downscaleOrAddError(ImageDownscaler $imageDownscaler, UploadedFile $imageFile, FormInterface $form): bool
+    {
+        if (!$imageDownscaler->needsDownscale($imageFile->getPathname())) {
+            return true;
+        }
+
+        try {
+            $imageDownscaler->downscale($imageFile->getPathname());
+
+            return true;
+        } catch (ImageDownscaleException $e) {
+            $form->get('imageFile')->addError(new FormError($e->getMessage()));
+
+            return false;
+        }
+    }
+
     #[Route('/user/create-article', name: 'app_management_create_article')]
-    public function createArticle(Request $request, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
+    public function createArticle(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
     {
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 3MB pro Bild – bitte laden Sie ggf. weniger Bilder gleichzeitig hoch.');
+            $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB für das Bild.');
 
             return $this->redirectToRoute('app_management_create_article');
         }
@@ -268,22 +395,25 @@ final class ManagementController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var UploadedFile $imageFile */
             $imageFile = $form->get('imageFile')->getData();
-            $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
 
-            $content->setImageUrl($imageUrl);
-            $content->setType(eContentType::ARTICLE);
-            $content->setCreator($creator);
+            if ($this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
+                $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
 
-            $entityManager->persist($content);
-            $entityManager->flush();
+                $content->setImageUrl($imageUrl);
+                $content->setType(eContentType::ARTICLE);
+                $content->setCreator($creator);
 
-            ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-            $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
-            $entityManager->flush();
+                $entityManager->persist($content);
+                $entityManager->flush();
 
-            $this->addFlash('success', 'Artikel erfolgreich erstellt!');
+                ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+                $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                $entityManager->flush();
 
-            return $this->redirectToRoute('app_management_user');
+                $this->addFlash('success', 'Artikel erfolgreich erstellt!');
+
+                return $this->redirectToRoute('app_management_user');
+            }
         }
 
         return $this->render('management/create_content.html.twig', [
@@ -293,12 +423,12 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/edit-content/{id}', name: 'app_management_edit_content')]
-    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository): Response
+    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository): Response
     {
         $this->denyAccessUnlessGranted('EDIT', $content);
 
         if ($this->isTruncatedUpload($request)) {
-            $this->addFlash('danger', 'Der Upload war zu groß und konnte nicht verarbeitet werden. Bitte laden Sie ein kleineres Bild hoch (max. 3MB).');
+            $this->addFlash('danger', 'Der Upload war zu groß und konnte nicht verarbeitet werden. Bitte laden Sie ein kleineres Bild hoch (max. 25 MB).');
 
             return $this->redirectToRoute('app_management_edit_content', ['id' => $content->getId()]);
         }
@@ -329,24 +459,27 @@ final class ManagementController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var UploadedFile|null $imageFile */
             $imageFile = $form->get('imageFile')->getData();
-            if ($imageFile) {
-                $oldImageUrl = $content->getImageUrl();
-                $newImageUrl = $imageUploader->upload($imageFile, $creator->getId());
-                $content->setImageUrl($newImageUrl);
-                $imageUploader->delete($oldImageUrl);
-            }
 
-            $entityManager->flush();
+            if (null === $imageFile || $this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
+                if ($imageFile) {
+                    $oldImageUrl = $content->getImageUrl();
+                    $newImageUrl = $imageUploader->upload($imageFile, $creator->getId());
+                    $content->setImageUrl($newImageUrl);
+                    $imageUploader->delete($oldImageUrl);
+                }
 
-            if ($form->has('audience')) {
-                ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
                 $entityManager->flush();
+
+                if ($form->has('audience')) {
+                    ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+                    $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                    $entityManager->flush();
+                }
+
+                $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
+
+                return $this->redirectToRoute('app_management_user');
             }
-
-            $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
-
-            return $this->redirectToRoute('app_management_user');
         }
 
         return $this->render('management/edit_content.html.twig', [

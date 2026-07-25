@@ -17,6 +17,15 @@
             {% endfor %}
         {% endfor %}
 
+        {# Set by the AJAX bulk upload, which redirects here after the last
+           image instead of using a session flash. #}
+        {% set uploadedCount = app.request.query.getInt('uploaded') %}
+        {% if uploadedCount > 0 %}
+            <div class="alert alert-success">
+                {{ uploadedCount }} Bild(er) erfolgreich hochgeladen!
+            </div>
+        {% endif %}
+
         <div class="surface" style="margin-top: var(--spacing-xl);">
             <h2>Einstellungen</h2>
             {{ form_start(durationForm, {'attr': {'data-turbo-scroll': 'false'}}) }}

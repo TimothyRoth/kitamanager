@@ -1,8 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Per-image upload limit (TVs cannot handle larger files). Matches the
-    // server-side "3M" constraint (Symfony uses 10^6 bytes per "M"). The
-    // total size of a bulk upload is deliberately not limited.
+    // Per-image limit stored on the server (TVs cannot handle larger files).
+    // Images above this are NOT rejected: the server downscales them to fit.
     const MAX_IMAGE_BYTES = 3 * 1000 * 1000;
+
+    // Hard cap for the original file; anything above this is rejected
+    // (matches the server-side "25M" constraint, 10^6 bytes per "M").
+    const MAX_ORIGINAL_BYTES = 25 * 1000 * 1000;
 
     // Add confirmation to specific forms
     const confirmForms = document.querySelectorAll('form[data-confirm]');
@@ -205,8 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Initialize multi-image upload preview. Every selected image gets a
-    // removable tile; oversized images are flagged and will be skipped on
-    // upload (they never block the rest of the batch).
+    // removable tile; images above the stored limit get a neutral hint that
+    // they will be downscaled on the server, originals above the hard cap
+    // are flagged as rejected.
     const initImagePreview = () => {
         const inputs = document.querySelectorAll('.image-multi-upload');
 
@@ -240,10 +244,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const tile = document.createElement('div');
                     tile.className = 'image-preview-tile';
 
+                    // Image + overlay badge share one box so the badge never
+                    // sits on top of the status line below the thumbnail.
+                    const media = document.createElement('div');
+                    media.className = 'image-preview-media';
+
                     const img = document.createElement('img');
                     img.className = 'thumbnail';
                     img.src = URL.createObjectURL(file);
-                    tile.appendChild(img);
+                    media.appendChild(img);
 
                     const removeButton = document.createElement('button');
                     removeButton.type = 'button';
@@ -252,18 +261,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     removeButton.title = `${file.name} entfernen`;
                     removeButton.setAttribute('aria-label', `${file.name} entfernen`);
                     removeButton.addEventListener('click', () => removeFileAt(index));
-                    tile.appendChild(removeButton);
+                    media.appendChild(removeButton);
 
-                    if (file.size > MAX_IMAGE_BYTES) {
-                        tile.classList.add('is-oversized');
-                        tile.title = `${file.name} ist größer als 3 MB und wird nicht hochgeladen`;
+                    if (file.size > MAX_ORIGINAL_BYTES) {
+                        tile.classList.add('is-rejected');
+                        tile.title = `${file.name} ist größer als 25 MB und kann nicht hochgeladen werden`;
+
+                        const badge = document.createElement('span');
+                        badge.className = 'image-preview-badge is-error';
+                        badge.textContent = 'zu groß (max. 25 MB)';
+                        media.appendChild(badge);
+                    } else if (file.size > MAX_IMAGE_BYTES) {
+                        tile.title = `${file.name} wird beim Hochladen automatisch verkleinert`;
 
                         const badge = document.createElement('span');
                         badge.className = 'image-preview-badge';
-                        badge.textContent = 'zu groß';
-                        tile.appendChild(badge);
+                        badge.textContent = 'wird verkleinert';
+                        media.appendChild(badge);
                     }
 
+                    tile.appendChild(media);
                     preview.appendChild(tile);
                 });
             };
@@ -339,21 +356,189 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Non-blocking notice (e.g. "oversized images were skipped") that stays
-    // visible while the remaining images upload.
-    const showUploadSkipNotice = (form, message) => {
-        form.querySelector('.upload-skip-notice')?.remove();
+    // Per-tile status during the sequential bulk upload.
+    // Success is visual only (green border) — no "Fertig" label that would
+    // sit under / over the "wird verkleinert" badge. Errors keep a text line.
+    const setTileStatus = (tile, text, state) => {
+        if (!tile) return;
 
-        const alert = document.createElement('div');
-        alert.className = 'alert alert-warning upload-skip-notice';
-        alert.textContent = message;
-
-        const progress = form.querySelector('.upload-progress');
-        if (progress) {
-            progress.insertAdjacentElement('afterend', alert);
-        } else {
-            form.appendChild(alert);
+        tile.classList.remove('is-uploading', 'is-done', 'is-failed');
+        if (state) {
+            tile.classList.add(state);
         }
+
+        let status = tile.querySelector('.image-preview-status');
+
+        // Done: drop any status text — the green frame is enough.
+        if (state === 'is-done' || !text) {
+            status?.remove();
+            return;
+        }
+
+        if (!status) {
+            status = document.createElement('span');
+            status.className = 'image-preview-status';
+            tile.appendChild(status);
+        }
+        status.textContent = text;
+    };
+
+    // Audience selection of the bulk form, read from the (unmapped) form
+    // fields so the AJAX endpoint can apply the same visibility rules.
+    const collectAudience = (form) => {
+        const allInput = form.querySelector('[data-audience-all]');
+        const ids = Array.from(form.querySelectorAll('[data-audience-list] input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+
+        return {all: !!(allInput && allInput.checked), ids};
+    };
+
+    // Upload ONE image to the JSON endpoint. Always resolves (never rejects)
+    // with {ok, downscaled} or {ok: false, error}.
+    const uploadSingleImage = (endpoint, token, file, audience, onProgress) => new Promise(resolve => {
+        const formData = new FormData();
+        formData.append('_token', token);
+        formData.append('image', file);
+        if (audience.all) {
+            formData.append('audienceAll', '1');
+        }
+        audience.ids.forEach(id => formData.append('audience[]', id));
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', endpoint);
+        xhr.responseType = 'json';
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                onProgress(e.loaded / e.total);
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            const data = xhr.response || {};
+            if (xhr.status === 200 && data.ok) {
+                resolve({ok: true, downscaled: !!data.downscaled});
+            } else if (xhr.status === 413) {
+                resolve({ok: false, error: 'Das Bild ist zu groß (max. 25 MB).'});
+            } else {
+                resolve({ok: false, error: data.error || 'Unerwarteter Fehler beim Hochladen.'});
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            resolve({ok: false, error: 'Verbindung unterbrochen. Bitte erneut versuchen.'});
+        });
+
+        xhr.send(formData);
+    });
+
+    // Bulk upload: send the images ONE BY ONE to the JSON endpoint so the
+    // server only ever processes a single image per request (OOM protection)
+    // and each image can be downscaled with visible per-image feedback.
+    const runSequentialUpload = async (form, input, ui) => {
+        const endpoint = form.dataset.uploadEndpoint;
+        const token = form.dataset.uploadToken;
+        const successUrl = form.dataset.uploadSuccessUrl;
+
+        const files = Array.from(input.files);
+        const audience = collectAudience(form);
+        const grid = form.querySelector('.image-preview-grid');
+        const tiles = grid ? Array.from(grid.querySelectorAll('.image-preview-tile')) : [];
+        const submitButton = form.querySelector('[type="submit"]');
+
+        // Lock the selection while uploading.
+        if (submitButton) submitButton.disabled = true;
+        input.disabled = true;
+        tiles.forEach(tile => {
+            tile.querySelector('.image-preview-remove')?.remove();
+            setTileStatus(tile, 'Wartet…');
+        });
+
+        form.querySelector('.upload-progress-error')?.remove();
+        ui.root.classList.remove('is-hidden');
+        ui.bar.classList.remove('is-indeterminate');
+        ui.bar.style.width = '0%';
+        ui.percent.textContent = '0%';
+
+        const failures = [];
+        let uploadedCount = 0;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const tile = tiles[i];
+            ui.label.textContent = `Bild ${i + 1} von ${files.length}: ${file.name}`;
+
+            if (file.size > MAX_ORIGINAL_BYTES) {
+                failures.push({file, error: 'Das Bild ist zu groß (max. 25 MB).'});
+                setTileStatus(tile, 'Zu groß (max. 25 MB)', 'is-failed');
+                continue;
+            }
+
+            const willDownscale = file.size > MAX_IMAGE_BYTES;
+            setTileStatus(tile, 'Wird hochgeladen… 0%', 'is-uploading');
+
+            const result = await uploadSingleImage(endpoint, token, file, audience, (fraction) => {
+                const percent = Math.min(100, Math.round(fraction * 100));
+                setTileStatus(
+                    tile,
+                    percent >= 100
+                        ? (willDownscale ? 'Wird verkleinert…' : 'Wird gespeichert…')
+                        : `Wird hochgeladen… ${percent}%`,
+                    'is-uploading'
+                );
+
+                const overall = Math.min(100, Math.round(((i + fraction) / files.length) * 100));
+                ui.bar.style.width = overall + '%';
+                ui.percent.textContent = overall + '%';
+            });
+
+            if (result.ok) {
+                uploadedCount++;
+                tile.title = result.downscaled
+                    ? `${file.name}: hochgeladen und verkleinert`
+                    : `${file.name}: hochgeladen`;
+                setTileStatus(tile, '', 'is-done');
+            } else {
+                failures.push({file, error: result.error});
+                setTileStatus(tile, result.error, 'is-failed');
+                tile.title = `${file.name}: ${result.error}`;
+            }
+        }
+
+        ui.bar.style.width = '100%';
+        ui.percent.textContent = '100%';
+
+        if (failures.length === 0) {
+            ui.label.textContent = 'Fertig – Sie werden weitergeleitet…';
+            const separator = successUrl.includes('?') ? '&' : '?';
+            window.location.href = successUrl + separator + 'uploaded=' + uploadedCount;
+            return;
+        }
+
+        // Keep only the failed files selected so a resubmit retries just them.
+        const transfer = new DataTransfer();
+        failures.forEach(({file}) => transfer.items.add(file));
+        input.disabled = false;
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change'));
+
+        // renderPreview rebuilt the tiles for the remaining (failed) files;
+        // re-attach the error message to each fresh tile.
+        const retryTiles = grid ? Array.from(grid.querySelectorAll('.image-preview-tile')) : [];
+        failures.forEach(({file, error}, index) => {
+            setTileStatus(retryTiles[index], error, 'is-failed');
+            if (retryTiles[index]) {
+                retryTiles[index].title = `${file.name}: ${error}`;
+            }
+        });
+
+        ui.root.classList.add('is-hidden');
+        if (submitButton) submitButton.disabled = false;
+
+        const summary = uploadedCount > 0
+            ? `${uploadedCount} Bild(er) hochgeladen, ${failures.length} fehlgeschlagen. Die fehlgeschlagenen Bilder bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`
+            : `${failures.length} Bild(er) konnten nicht hochgeladen werden. Sie bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`;
+        showUploadProgressError(form, summary);
     };
 
     const initUploadProgress = () => {
@@ -386,69 +571,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 event.preventDefault();
 
-                form.querySelector('.upload-skip-notice')?.remove();
+                // Bulk image form: hand over to the sequential per-image
+                // AJAX loop (one request per image, server-side downscaling).
+                const multiInput = form.querySelector('input[type="file"].image-multi-upload');
+                if (multiInput && form.dataset.uploadEndpoint) {
+                    runSequentialUpload(form, multiInput, ui);
+                    return;
+                }
 
-                // Oversized images never block the batch: they are removed
-                // from multi-upload inputs and the remaining images are
-                // uploaded. Single-file inputs (article/edit forms) cannot be
-                // partially submitted, so there an oversized image stops the
-                // submit with an error instead. The inputs are only mutated
-                // once it is certain the upload proceeds, so a fully oversized
-                // selection keeps its preview and can still be corrected.
-                const fileInputs = Array.from(form.querySelectorAll('input[type="file"]'));
-                const skippedNames = [];
-                const filterPlans = [];
-                let oversizedSingleFile = false;
-                let remainingCount = 0;
-
-                fileInputs.forEach(input => {
-                    const files = Array.from(input.files || []);
-                    const oversized = files.filter(file => file.size > MAX_IMAGE_BYTES);
-
-                    if (oversized.length > 0 && !input.multiple) {
-                        oversizedSingleFile = true;
-                        return;
-                    }
-
-                    const keep = files.filter(file => file.size <= MAX_IMAGE_BYTES);
-                    remainingCount += keep.length;
-
-                    if (oversized.length > 0) {
-                        filterPlans.push({input, keep});
-                        skippedNames.push(...oversized.map(file => file.name));
-                    }
-                });
-
-                if (oversizedSingleFile) {
+                // Originals above the hard cap cannot be stored at all; the
+                // server would reject them, so fail fast before uploading.
+                const tooBig = Array.from(form.querySelectorAll('input[type="file"]'))
+                    .some(input => Array.from(input.files || []).some(file => file.size > MAX_ORIGINAL_BYTES));
+                if (tooBig) {
                     showUploadProgressError(
                         form,
-                        'Das ausgewählte Bild ist größer als 3 MB und kann nicht hochgeladen werden. Bitte verkleinern Sie es.'
+                        'Das ausgewählte Bild ist größer als 25 MB und kann nicht hochgeladen werden. Bitte verkleinern Sie es.'
                     );
                     return;
                 }
 
-                if (remainingCount === 0) {
-                    showUploadProgressError(
-                        form,
-                        'Alle ausgewählten Bilder sind größer als 3 MB und können daher nicht hochgeladen werden. Bitte verkleinern Sie die Bilder (max. 3 MB pro Bild).'
-                    );
-                    return;
-                }
-
-                filterPlans.forEach(({input, keep}) => {
-                    const transfer = new DataTransfer();
-                    keep.forEach(file => transfer.items.add(file));
-                    input.files = transfer.files;
-                    // Keep the preview tiles in sync with the filtered selection.
-                    input.dispatchEvent(new Event('change'));
-                });
-
-                if (skippedNames.length > 0) {
-                    showUploadSkipNotice(
-                        form,
-                        `${skippedNames.length} Bild(er) über 3 MB werden übersprungen: ${skippedNames.join(', ')}. Die übrigen Bilder werden hochgeladen.`
-                    );
-                }
+                // Whether the selected image exceeds the stored limit and will
+                // therefore be downscaled on the server after the upload.
+                const willDownscale = Array.from(form.querySelectorAll('input[type="file"]'))
+                    .some(input => Array.from(input.files || []).some(file => file.size > MAX_IMAGE_BYTES));
 
                 syncWysiwygFields(form);
 
@@ -477,7 +623,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ui.percent.textContent = percent + '%';
 
                     if (percent >= 100) {
-                        ui.label.textContent = 'Wird auf dem Server verarbeitet…';
+                        ui.label.textContent = willDownscale
+                            ? 'Wird verkleinert…'
+                            : 'Wird auf dem Server verarbeitet…';
                     }
                 });
 
@@ -490,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (xhr.status === 413) {
                         showUploadProgressError(
                             form,
-                            'Der Upload war zu groß. Bitte kleinere Dateien wählen (max. 3 MB pro Bild).'
+                            'Der Upload war zu groß. Bitte ein kleineres Bild wählen (max. 25 MB).'
                         );
                         return;
                     }

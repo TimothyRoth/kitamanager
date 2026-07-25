@@ -15,7 +15,16 @@
         <div class="surface">
             <h1>{{ page_title }}</h1>
 
-            {{ form_start(form, {'attr': {'data-upload-with-progress': '', 'data-turbo': 'false'}}) }}
+            {# The bulk image form uploads via a sequential AJAX loop (one
+               request per image); the endpoint data is ignored by the
+               single-image forms, which keep the plain whole-form XHR. #}
+            {{ form_start(form, {'attr': {
+                'data-upload-with-progress': '',
+                'data-turbo': 'false',
+                'data-upload-endpoint': path('app_management_upload_image'),
+                'data-upload-token': csrf_token('upload-image'),
+                'data-upload-success-url': path('app_management_user')
+            }}) }}
             <div class="form-group">
                 {{ form_widget(form) }}
             </div>
