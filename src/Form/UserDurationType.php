@@ -19,11 +19,11 @@ class UserDurationType extends AbstractType
                 'label' => 'Dauer zwischen den Slides (in Sekunden)',
                 'constraints' => [
                     new NotBlank(),
-                    new Range([
-                        'min' => 1,
-                        'max' => 60,
-                        'notInRangeMessage' => 'Die Dauer muss zwischen {{ min }} und {{ max }} Sekunden liegen.',
-                    ]),
+                    new Range(
+                        min: 1,
+                        max: 60,
+                        notInRangeMessage: 'Die Dauer muss zwischen {{ min }} und {{ max }} Sekunden liegen.',
+                    ),
                 ],
                 'attr' => [
                     'min' => 1,

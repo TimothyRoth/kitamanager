@@ -20,17 +20,15 @@ class UserType extends AbstractType
         $builder->add('username', options: ['label' => 'Benutzername']);
 
         $passwordConstraints = [
-            new Length([
-                'min' => 6,
-                'minMessage' => 'Das Passwort sollte mindestens {{ limit }} Zeichen lang sein.',
-                'max' => 4096,
-            ]),
+            new Length(
+                min: 6,
+                max: 4096,
+                minMessage: 'Das Passwort sollte mindestens {{ limit }} Zeichen lang sein.',
+            ),
         ];
 
         if ($options['is_new']) {
-            $passwordConstraints[] = new NotBlank([
-                'message' => 'Bitte Passwort eingeben.',
-            ]);
+            $passwordConstraints[] = new NotBlank(message: 'Bitte Passwort eingeben.');
         }
 
         $builder->add('plainPassword', PasswordType::class, [

@@ -18,10 +18,10 @@ class UserDevicePinType extends AbstractType
                 'label' => 'Fernseher-PIN (4 Ziffern)',
                 'required' => false,
                 'constraints' => [
-                    new Regex([
-                        'pattern' => '/^\d{4}$/',
-                        'message' => 'Die PIN muss aus genau 4 Ziffern bestehen.',
-                    ]),
+                    new Regex(
+                        pattern: '/^\d{4}$/',
+                        message: 'Die PIN muss aus genau 4 Ziffern bestehen.',
+                    ),
                 ],
                 'attr' => [
                     'placeholder' => 'z. B. 4711',

@@ -20,8 +20,8 @@ class ChangePasswordType extends AbstractType
                 'mapped' => false,
                 'attr' => ['autocomplete' => 'current-password'],
                 'constraints' => [
-                    new NotBlank(['message' => 'Bitte geben Sie Ihr aktuelles Passwort ein.']),
-                    new UserPassword(['message' => 'Das aktuelle Passwort ist nicht korrekt.']),
+                    new NotBlank(message: 'Bitte geben Sie Ihr aktuelles Passwort ein.'),
+                    new UserPassword(message: 'Das aktuelle Passwort ist nicht korrekt.'),
                 ],
             ])
             ->add('newPassword', PasswordType::class, [
@@ -29,12 +29,12 @@ class ChangePasswordType extends AbstractType
                 'mapped' => false,
                 'attr' => ['autocomplete' => 'new-password'],
                 'constraints' => [
-                    new NotBlank(['message' => 'Bitte geben Sie ein neues Passwort ein.']),
-                    new Length([
-                        'min' => 6,
-                        'minMessage' => 'Das Passwort sollte mindestens {{ limit }} Zeichen lang sein.',
-                        'max' => 4096,
-                    ]),
+                    new NotBlank(message: 'Bitte geben Sie ein neues Passwort ein.'),
+                    new Length(
+                        min: 6,
+                        max: 4096,
+                        minMessage: 'Das Passwort sollte mindestens {{ limit }} Zeichen lang sein.',
+                    ),
                 ],
             ]);
     }

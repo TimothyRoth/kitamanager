@@ -63,12 +63,12 @@ class ContentType extends AbstractType
             $builder
                 ->add('title', TextType::class, [
                     'label' => 'Titel',
-                    'constraints' => [new NotBlank(['message' => 'Bitte geben Sie einen Titel an.'])],
+                    'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Titel an.')],
                 ])
                 ->add('content', TextareaType::class, [
                     'label' => 'Inhalt',
                     'attr' => ['class' => 'wysiwyg'],
-                    'constraints' => [new NotBlank(['message' => 'Bitte geben Sie einen Inhalt an.'])],
+                    'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Inhalt an.')],
                 ]);
         }
 

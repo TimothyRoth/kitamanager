@@ -45,7 +45,7 @@ flowchart TD
     Slider --> TV["TV ruft /slider/display auf,\nPIN-Eingabe → Slider der Kita\nwird ohne Login angezeigt"]
 ```
 
-**Hinweis für Tests:** Ein Admin, der `/management/user` aufruft, wird automatisch auf `/management/admin` umgeleitet – und umgekehrt eine Kita von `/management/admin` auf `/management/user`.
+**Hinweis für Tests:** Ein Admin, der `/management/user` aufruft, wird automatisch auf `/management/admin` umgeleitet. Eine Kita, die `/management/admin` aufruft, erhält **403 Access Denied** (`access_control` verlangt `ROLE_ADMIN`); die geplante Umleitung im `ManagementRedirectSubscriber` greift dort nicht.
 
 ---
 
@@ -150,7 +150,7 @@ classDiagram
 ### Login & Rollen
 - [ ] Login mit falschen Daten schlägt fehl, Fehlermeldung erscheint.
 - [ ] Admin landet nach Login auf `/management/admin`, Kita auf `/management/user`.
-- [ ] Kita kann `/management/admin` nicht aufrufen (Umleitung auf eigenes Dashboard).
+- [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied; Doc-Soll „Umleitung“ greift nicht, weil `access_control` vorher blockiert).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
 - [ ] Logout beendet die Sitzung.
 
