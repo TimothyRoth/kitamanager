@@ -9,14 +9,14 @@ use App\Enum\ContentType;
 use App\Service\AudienceSynchronizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Function tests mapped to docs/autorisierung-und-benutzerverwaltung.md §5.
  */
-final class AuthorizationFlowTest extends WebTestCase
+final class AuthorizationFlowTest extends AppWebTestCase
 {
     private KernelBrowser $client;
     private EntityManagerInterface $em;

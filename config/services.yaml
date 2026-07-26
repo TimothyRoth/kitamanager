@@ -30,3 +30,9 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+when@test:
+    parameters:
+        # Isolate uploads from public/uploads so tests never wipe real images
+        # (test users often get id=1 and would delete public/uploads/1/).
+        uploads_directory: '%kernel.project_dir%/var/uploads_test'

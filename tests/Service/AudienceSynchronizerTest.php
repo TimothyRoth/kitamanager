@@ -7,15 +7,15 @@ use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Enum\ContentType;
 use App\Service\AudienceSynchronizer;
+use App\Tests\AppKernelTestCase;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Domain tests for audience → SliderItem reconciliation.
  */
-final class AudienceSynchronizerTest extends KernelTestCase
+final class AudienceSynchronizerTest extends AppKernelTestCase
 {
     private EntityManagerInterface $em;
     private AudienceSynchronizer $audience;

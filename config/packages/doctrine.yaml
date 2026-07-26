@@ -24,8 +24,12 @@ doctrine:
 when@test:
     doctrine:
         dbal:
-            # "TEST_TOKEN" is typically set by ParaTest
-            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+            # Hard-lock PHPUnit to a dedicated SQLite file. Do NOT use DATABASE_URL
+            # here – a production DATABASE_URL in the environment (or .env.local)
+            # must never be reachable from tests (SchemaTool drops the whole schema).
+            # dbname_suffix alone is not enough: it has no effect on SQLite, and a
+            # mis-set URL could still point at a real Postgres/MySQL database.
+            url: 'sqlite:///%kernel.project_dir%/var/data_test.db'
 
 when@prod:
     doctrine:

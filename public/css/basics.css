@@ -17,6 +17,8 @@
     --spacing-xl: 3rem;
 
     --border-radius: 0.5rem;
+    /* Apple HIG minimum; used for iPad/touch administration controls */
+    --touch-target: 2.75rem;
 
     --font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }

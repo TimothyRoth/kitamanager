@@ -1,10 +1,11 @@
 {% extends 'base.html.twig' %}
 
 {% block title %}Benutzer-Dashboard{% endblock %}
+{% block body_class %}management{% endblock %}
 
 {% block body %}
     <div class="container">
-        <div class="flex-between">
+        <div class="flex-between page-header">
             <h1>Willkommen, {{ app.user.username }}!</h1>
             <a href="{{ logout_path() }}" class="btn btn-link">Abmelden</a>
         </div>
@@ -52,7 +53,7 @@
         {# ---------------------------------------------------------------- #}
         {#  Meine Inhalte (selbst erstellt) #}
         {# ---------------------------------------------------------------- #}
-        <div class="flex-between" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
             <h2 style="margin-bottom: 0;">Meine Inhalte</h2>
             <div class="actions-bar" style="margin-bottom: 0;">
                 <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder hinzufügen</a>
@@ -70,7 +71,7 @@
 
         <div class="data-list">
             <div class="data-row data-header">
-                <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                <div class="data-cell cell-checkbox cell-checkbox-col">
                     <input type="checkbox" data-bulk-select-all title="Alle auswählen">
                 </div>
                 <div class="data-cell">Typ</div>
@@ -81,7 +82,7 @@
 
             {% for content in contents %}
                 <div class="data-row">
-                    <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                    <div class="data-cell cell-checkbox cell-checkbox-col">
                         <span class="data-cell-label">Auswählen</span>
                         <input type="checkbox" class="bulk-checkbox" name="ids[]"
                                value="{{ content.id }}" form="bulkDeleteForm">
@@ -128,7 +129,7 @@
         {# ---------------------------------------------------------------- #}
         {#  Mein Slider (was mir ausgespielt wird) #}
         {# ---------------------------------------------------------------- #}
-        <div class="flex-between" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
             <div class="header-actions">
                 <h2 style="margin-bottom: 0;">Mein Slider</h2>
                 <span>(<a href="{{ path('app_slider') }}" class="btn-link">zum Slider</a>)</span>
@@ -138,7 +139,7 @@
         <div class="data-list">
             <div class="data-row data-header">
                 {% if sliderItems|length > 1 %}
-                    <div class="data-cell" style="flex: 0 0 100px;">Reihenfolge</div>
+                    <div class="data-cell cell-order">Reihenfolge</div>
                 {% endif %}
                 <div class="data-cell">Typ</div>
                 <div class="data-cell" style="flex: 2;">Titel/Bild</div>
@@ -150,7 +151,7 @@
                 {% set content = item.content %}
                 <div class="data-row {{ not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
                     {% if sliderItems|length > 1 %}
-                        <div class="data-cell" style="flex: 0 0 100px;">
+                        <div class="data-cell cell-order">
                             <span class="data-cell-label">Reihenfolge</span>
                             <div class="table-actions">
                                 {% if not loop.first %}
@@ -207,8 +208,8 @@
                                    value="{{ csrf_token('toggle-status' ~ item.id) }}">
                             <button type="submit"
                                     class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
-                                    title="Klicken, um den Status zu ändern"
-                                    aria-label="{{ item.isEnabled ? 'Aktiv – klicken zum Deaktivieren' : 'Inaktiv – klicken zum Aktivieren' }}">
+                                    title="Tippen, um den Status zu ändern"
+                                    aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
                                 <span class="status-toggle-dot" aria-hidden="true"></span>
                                 {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
                             </button>

@@ -3,6 +3,17 @@
     max-width: 960px;
     margin: 0 auto;
     padding: var(--spacing-md);
+    padding-left: max(var(--spacing-md), env(safe-area-inset-left));
+    padding-right: max(var(--spacing-md), env(safe-area-inset-right));
+    padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
+}
+
+/* Comfortable width from iPad portrait (820) upward */
+@media (min-width: 820px) {
+    body.management .container {
+        max-width: 72rem;
+        padding-top: var(--spacing-lg);
+    }
 }
 
 .surface {

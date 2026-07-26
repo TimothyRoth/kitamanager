@@ -6,15 +6,16 @@ use App\Entity\Content;
 use App\Entity\User;
 use App\Enum\ContentType;
 use App\Service\ImageUploader;
+use App\Tests\AppKernelTestCase;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Ensures Doctrine preRemove hooks delete uploaded files from disk.
+ * Uses the test uploads dir (var/uploads_test), never public/uploads.
  */
-final class ImageDeletionListenerTest extends KernelTestCase
+final class ImageDeletionListenerTest extends AppKernelTestCase
 {
     private EntityManagerInterface $em;
     private ImageUploader $uploader;
@@ -30,6 +31,9 @@ final class ImageDeletionListenerTest extends KernelTestCase
         $this->uploader = $container->get(ImageUploader::class);
         $this->uploadsDir = $this->uploader->getTargetDirectory();
 
+        if (!is_dir($this->uploadsDir)) {
+            mkdir($this->uploadsDir, 0777, true);
+        }
         $meta = $this->em->getMetadataFactory()->getAllMetadata();
         $tool = new SchemaTool($this->em);
         $tool->dropSchema($meta);

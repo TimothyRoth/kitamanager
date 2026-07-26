@@ -6,12 +6,12 @@ use App\Entity\User;
 use App\Service\ImageDownscaler;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-final class UploadImageTest extends WebTestCase
+final class UploadImageTest extends AppWebTestCase
 {
     private KernelBrowser $client;
     private EntityManagerInterface $em;

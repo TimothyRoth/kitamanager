@@ -14,8 +14,10 @@
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
         <ini name="memory_limit" value="512M" />
-        <server name="KERNEL_CLASS" value="App\Kernel" />
+        <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
         <server name="APP_ENV" value="test" force="true" />
+        <!-- force=true overrides a production DATABASE_URL from the environment -->
+        <server name="DATABASE_URL" value="sqlite:///%kernel.project_dir%/var/data_test.db" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
     </php>
 

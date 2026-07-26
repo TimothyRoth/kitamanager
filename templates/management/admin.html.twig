@@ -1,10 +1,11 @@
 {% extends 'base.html.twig' %}
 
 {% block title %}Admin Dashboard{% endblock %}
+{% block body_class %}management{% endblock %}
 
 {% block body %}
     <div class="container">
-        <div class="flex-between">
+        <div class="flex-between page-header">
             <h1>Willkommen, {{ app.user.username }}!</h1>
             <a href="{{ logout_path() }}" class="btn btn-link">Abmelden</a>
         </div>
@@ -65,7 +66,7 @@
             {% endfor %}
         </div>
 
-        <div class="flex-between" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
             <h2>Zentrale Inhalte verwalten</h2>
             <div class="actions-bar" style="margin-bottom: 0;">
                 <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder
@@ -90,7 +91,7 @@
 
         <div class="data-list">
             <div class="data-row data-header">
-                <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                <div class="data-cell cell-checkbox cell-checkbox-col">
                     <input type="checkbox" data-bulk-select-all title="Alle auswählen">
                 </div>
                 <div class="data-cell">Typ</div>
@@ -101,7 +102,7 @@
 
             {% for content in contents %}
                 <div class="data-row">
-                    <div class="data-cell cell-checkbox" style="flex: 0 0 40px;">
+                    <div class="data-cell cell-checkbox cell-checkbox-col">
                         <span class="data-cell-label">Auswählen</span>
                         <input type="checkbox" class="bulk-checkbox" name="ids[]"
                                value="{{ content.id }}" form="bulkDeleteForm">

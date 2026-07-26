@@ -9,15 +9,15 @@ use App\Enum\ContentType;
 use App\Service\AudienceSynchronizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Content CRUD, validation, bulk delete, and TV cookie linking.
  */
-final class ContentLifecycleTest extends WebTestCase
+final class ContentLifecycleTest extends AppWebTestCase
 {
     private KernelBrowser $client;
     private EntityManagerInterface $em;

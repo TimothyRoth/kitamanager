@@ -1,0 +1,409 @@
+/**
+ * Administration UI – primary target: iPad (A16 / 11th gen, 2025).
+ *
+ * Viewport reference (CSS px, scale 2):
+ *   Portrait  820 × 1180
+ *   Landscape 1180 × 820
+ *
+ * Layout bands:
+ *   ≤ 819px   phones / narrow – stacked cards, full-width actions
+ *   820–1279  iPad 2025 (both orientations) – stacked cards, roomy controls
+ *   ≥ 1280px  desktop monitors – compact dense rows
+ *
+ * Scoped to body.management so TV slider pages stay untouched.
+ */
+
+body.management {
+    -webkit-tap-highlight-color: rgba(15, 23, 42, 0.12);
+    touch-action: manipulation;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Touch-sized controls (iPad-first; desktop overrides below)         */
+/* ------------------------------------------------------------------ */
+
+body.management .btn,
+body.management button:not(.wysiwyg-btn):not(.image-preview-remove) {
+    min-height: var(--touch-target);
+    padding: 0.65rem 1.15rem;
+}
+
+body.management .btn-link,
+body.management button.btn-link,
+body.management a.btn-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    padding: 0.5rem 0.85rem;
+    border-radius: var(--border-radius);
+}
+
+body.management .btn-link:active,
+body.management button.btn-link:active {
+    background-color: var(--color-bg);
+}
+
+body.management .btn-icon {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+}
+
+body.management .btn-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+body.management .btn-icon:active {
+    background-color: var(--color-bg);
+    color: var(--color-primary);
+}
+
+body.management .status-toggle {
+    min-height: var(--touch-target);
+    padding: 0.55rem 1.1rem;
+    font-size: 1rem;
+}
+
+body.management .status-toggle-hint {
+    display: block;
+}
+
+body.management .wysiwyg-btn {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+}
+
+body.management input[type="text"],
+body.management input[type="password"],
+body.management input[type="number"],
+body.management textarea,
+body.management select,
+body.management input[type="file"] {
+    min-height: var(--touch-target);
+    padding: 0.65rem 0.85rem;
+}
+
+body.management input[type="checkbox"],
+body.management input[type="radio"] {
+    width: 1.35rem;
+    height: 1.35rem;
+    accent-color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+body.management .cell-checkbox-col {
+    flex: 0 0 auto;
+    min-width: var(--touch-target);
+}
+
+body.management .cell-checkbox input[type="checkbox"] {
+    width: 1.35rem;
+    height: 1.35rem;
+    margin: 0;
+}
+
+body.management .form-check {
+    min-height: var(--touch-target);
+    padding: 0.45rem 0.25rem;
+    gap: var(--spacing-sm);
+}
+
+body.management .choice-list {
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    max-height: 22rem;
+    gap: var(--spacing-sm) var(--spacing-md);
+    -webkit-overflow-scrolling: touch;
+}
+
+body.management .image-preview-remove {
+    top: -0.35rem;
+    right: -0.35rem;
+    /* Visible circle stays compact; ::after expands the tap target for iPad */
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0 0 0.1em;
+}
+
+body.management .image-preview-remove::after {
+    content: '';
+    position: absolute;
+    inset: -0.45rem;
+}
+
+body.management .image-preview-grid img,
+body.management .image-preview-tile {
+    max-width: 9rem;
+}
+
+body.management .image-preview-grid img {
+    max-height: 9rem;
+}
+
+body.management .thumbnail {
+    max-width: 7.5rem;
+    border-radius: var(--border-radius);
+}
+
+body.management .current-image-preview {
+    display: block;
+    max-width: min(100%, 20rem);
+    margin: var(--spacing-sm) 0 var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+body.management .table-actions {
+    gap: var(--spacing-sm);
+}
+
+body.management .btn-block {
+    width: 100%;
+}
+
+body.management .login-surface {
+    max-width: 28rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+body.management .page-header .btn-link,
+body.management .surface > .btn-link,
+body.management .surface > div > .btn-link {
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+}
+
+/* ------------------------------------------------------------------ */
+/*  iPad 2025 + phones (≤1279): stacked cards – never dense rows       */
+/*  Landscape iPad is 1180 CSS px wide and must stay in this band.     */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1279px) {
+    body.management .data-header {
+        display: none;
+    }
+
+    body.management .data-row {
+        flex-direction: column;
+        align-items: stretch;
+        padding: var(--spacing-md) var(--spacing-lg);
+        gap: 0;
+    }
+
+    body.management .data-cell {
+        display: flex;
+        flex-direction: column;
+        padding: var(--spacing-sm) 0;
+        text-align: left;
+        align-items: flex-start;
+    }
+
+    body.management .data-cell + .data-cell {
+        border-top: 1px solid var(--color-border);
+    }
+
+    body.management .data-cell-label {
+        display: block;
+    }
+
+    body.management .cell-checkbox {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    body.management .cell-actions {
+        justify-content: flex-start;
+        gap: var(--spacing-sm);
+        min-width: 0;
+        width: 100%;
+    }
+
+    body.management .cell-actions .btn-link,
+    body.management .cell-actions button.btn-link {
+        flex: 1 1 auto;
+        border: 1px solid var(--color-border);
+        background-color: var(--color-bg);
+    }
+
+    body.management .cell-actions .form-inline {
+        display: flex;
+        flex: 1 1 auto;
+        margin: 0;
+    }
+
+    body.management .cell-actions .form-inline .btn-link {
+        width: 100%;
+    }
+
+    body.management .cell-actions button.btn-link.text-danger {
+        border-color: #fecaca;
+        background-color: #fef2f2;
+    }
+
+    body.management .flex-between {
+        align-items: stretch;
+    }
+
+    body.management .page-header {
+        align-items: flex-start;
+    }
+}
+
+/* Portrait iPad / phones: stack section actions full width */
+@media (max-width: 819px) {
+    body.management .actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    body.management .actions-bar > *,
+    body.management .actions-bar .btn,
+    body.management .actions-bar form,
+    body.management .actions-bar form button {
+        width: 100%;
+    }
+}
+
+/* iPad landscape (and similar widths): keep actions in a wrap row */
+@media (min-width: 820px) and (max-width: 1279px) {
+    body.management .section-header {
+        align-items: center;
+    }
+
+    body.management .actions-bar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        width: auto;
+        margin-bottom: 0;
+    }
+
+    body.management .actions-bar > *,
+    body.management .actions-bar .btn,
+    body.management .actions-bar form,
+    body.management .actions-bar form button {
+        width: auto;
+    }
+
+    body.management .data-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    body.management .data-list > .data-empty {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Desktop (≥1280): compact dense rows for mouse / keyboard           */
+/* ------------------------------------------------------------------ */
+
+@media (min-width: 1280px) {
+    body.management .data-row {
+        flex-direction: row;
+        align-items: center;
+        padding: var(--spacing-sm) var(--spacing-md);
+        gap: var(--spacing-sm);
+    }
+
+    body.management .data-header {
+        display: flex;
+        font-weight: 600;
+        background-color: var(--color-bg);
+        border: 1px solid transparent;
+        border-bottom: 2px solid var(--color-border);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    body.management .data-cell {
+        display: block;
+    }
+
+    body.management .data-cell-label {
+        display: none;
+    }
+
+    body.management .cell-actions {
+        justify-content: flex-end;
+        flex: 0 1 auto;
+        min-width: 14rem;
+    }
+
+    body.management .cell-checkbox {
+        justify-content: center;
+    }
+
+    body.management .cell-order {
+        flex: 0 0 7rem;
+    }
+
+    body.management .data-row:not(.data-header):hover {
+        background-color: var(--color-bg);
+    }
+
+    body.management .status-toggle-hint {
+        display: none;
+    }
+
+    /* Slightly tighter controls – desktop doesn't need 44px everywhere */
+    body.management .btn,
+    body.management button:not(.wysiwyg-btn):not(.btn-icon):not(.status-toggle):not(.image-preview-remove) {
+        min-height: 2.25rem;
+        padding: 0.45rem 1rem;
+    }
+
+    body.management .btn-link,
+    body.management button.btn-link,
+    body.management a.btn-link {
+        min-height: 2.25rem;
+        min-width: auto;
+        padding: 0.35rem 0.65rem;
+    }
+
+    body.management .btn-icon {
+        min-width: 2.25rem;
+        min-height: 2.25rem;
+    }
+
+    body.management input[type="text"],
+    body.management input[type="password"],
+    body.management input[type="number"],
+    body.management textarea,
+    body.management select,
+    body.management input[type="file"] {
+        min-height: 2.25rem;
+        padding: 0.4rem 0.75rem;
+    }
+
+    body.management .container {
+        max-width: 72rem;
+    }
+}
+
+/* Prefer active feedback over hover-only cues on touch */
+@media (hover: none) {
+    body.management .btn-primary:active,
+    body.management button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):not(.status-toggle):active {
+        background-color: var(--color-primary-hover);
+    }
+
+    body.management .data-row:not(.data-header):active {
+        background-color: var(--color-bg);
+    }
+}
