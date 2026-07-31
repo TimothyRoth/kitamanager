@@ -123,6 +123,17 @@ button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):not(.statu
     border-color: var(--color-danger-hover);
 }
 
+.btn-secondary {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+}
+
+.btn-secondary:hover {
+    background-color: var(--color-bg);
+    border-color: var(--color-text-muted);
+}
+
 .btn-danger:disabled,
 button[data-bulk-submit]:disabled {
     display: none;
@@ -641,29 +652,88 @@ button.btn-link.text-danger:hover {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Expanded choice lists (assigned users / audience) – scale to 100s  */
+/*  Expanded choice lists (Kita / audience assignment)                 */
 /* ------------------------------------------------------------------ */
 .choice-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: var(--spacing-xs) var(--spacing-md);
+    gap: var(--spacing-sm);
     max-height: 16rem;
     overflow-y: auto;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background-color: var(--color-bg);
+}
+
+.choice-picker {
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     background-color: var(--color-surface);
+    overflow: hidden;
+}
+
+.choice-picker .choice-list {
+    border: none;
+    border-radius: 0;
+    max-height: 20rem;
+}
+
+.choice-picker-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.choice-picker-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-left: auto;
+}
+
+.choice-picker-meta {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+}
+
+.choice-filter {
+    flex: 1 1 12rem;
+    min-width: 0;
+    margin-bottom: 0;
 }
 
 .form-check {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
     margin: 0;
-    padding: 0.2rem 0;
+    padding: 0.55rem 0.65rem;
     font-weight: 400;
     cursor: pointer;
     min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background-color: var(--color-surface);
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.form-check:hover {
+    border-color: var(--color-text-muted);
+}
+
+.form-check:has(input:checked) {
+    border-color: var(--color-primary);
+    background-color: #f1f5f9;
 }
 
 .form-check input[type="checkbox"],
@@ -673,15 +743,27 @@ button.btn-link.text-danger:hover {
     flex-shrink: 0;
 }
 
+.choice-avatar {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--color-surface);
+    background-color: var(--color-primary);
+    text-transform: uppercase;
+}
+
 .form-check-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* Client-side filter injected above long choice lists */
-.choice-filter {
-    margin-bottom: var(--spacing-sm);
+    min-width: 0;
 }
 
 /* ------------------------------------------------------------------ */

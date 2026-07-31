@@ -71,7 +71,7 @@
             <div class="actions-bar" style="margin-bottom: 0;">
                 <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder
                     hinzufügen</a>
-                <a href="{{ path('app_management_create_article') }}" class="btn btn-primary">Artikel
+                <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel
                     hinzufügen</a>
                 <form id="bulkDeleteForm" method="post"
                       action="{{ path('app_management_bulk_delete_content') }}"
@@ -122,9 +122,9 @@
                     <div class="data-cell">
                         <span class="data-cell-label">Zielgruppe</span>
                         {% if content.audienceAll %}
-                            Alle Benutzer
+                            Alle Kitas
                         {% else %}
-                            {{ content.sliderItems|length }} Benutzer
+                            {{ content.sliderItems|length }} Kitas
                         {% endif %}
                     </div>
                     <div class="data-cell cell-actions">

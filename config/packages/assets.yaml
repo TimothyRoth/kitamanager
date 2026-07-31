@@ -1,0 +1,5 @@
+# Cache-bust public CSS/JS via asset() → path?v=<git short hash|ASSET_VERSION>
+framework:
+    assets:
+        version: '%env(git_asset:ASSET_VERSION)%'
+        version_format: '%%s?v=%%s'

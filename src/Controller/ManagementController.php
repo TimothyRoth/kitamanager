@@ -254,7 +254,7 @@ final class ManagementController extends AbstractController
             if ($created) {
                 $this->addFlash('success', sprintf('%d Bild(er) erfolgreich hochgeladen!', count($created)));
 
-                return $this->redirectToRoute('app_management_user');
+                return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
 
             return $this->redirectToRoute('app_management_create_image');
@@ -262,7 +262,7 @@ final class ManagementController extends AbstractController
 
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
-            'page_title' => 'Neue Bilder hinzufügen',
+            'page_title' => 'Neue Fotos hinzufügen',
         ]);
     }
 
@@ -412,7 +412,7 @@ final class ManagementController extends AbstractController
 
                 $this->addFlash('success', 'Artikel erfolgreich erstellt!');
 
-                return $this->redirectToRoute('app_management_user');
+                return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
         }
 
@@ -478,7 +478,7 @@ final class ManagementController extends AbstractController
 
                 $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
 
-                return $this->redirectToRoute('app_management_user');
+                return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
         }
 

@@ -124,7 +124,7 @@ final class ContentLifecycleTest extends AppWebTestCase
         $form['content[imageFile]']->upload($uploadPath);
 
         $this->client->submit($form);
-        self::assertResponseRedirects('/management/user');
+        self::assertResponseRedirects('/management/user#mein-slider');
 
         $this->em->clear();
         $created = $this->em->getRepository(Content::class)->findOneBy(['title' => 'Hallo Kita']);

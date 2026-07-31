@@ -24,12 +24,14 @@
                 'data-turbo': 'false',
                 'data-upload-endpoint': path('app_management_upload_image'),
                 'data-upload-token': csrf_token('upload-image'),
-                'data-upload-success-url': path('app_management_user')
+                'data-upload-success-url': path('app_management_user') ~ '#mein-slider'
             }}) }}
             <div class="form-group">
                 {{ form_widget(form) }}
             </div>
-            <button type="submit" class="btn btn-primary">Speichern</button>
+            <button type="submit" class="btn btn-primary">
+                {{ attribute(form.imageFile.vars.attr, 'multiple') is defined ? 'Fotos hochladen' : 'Speichern' }}
+            </button>
             {{ form_end(form) }}
 
             <div style="margin-top: var(--spacing-md);">

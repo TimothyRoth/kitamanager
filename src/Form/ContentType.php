@@ -41,20 +41,26 @@ class ContentType extends AbstractType
         ]);
 
         $imageOptions = [
-            'label' => $options['multiple'] ? 'Bilder hochladen' : 'Bild hochladen',
+            'label' => $options['multiple']
+                ? 'Fotos auswählen oder aufnehmen'
+                : 'Bild auswählen oder aufnehmen',
             'mapped' => false,
             'multiple' => $options['multiple'],
             'required' => $options['is_new'],
             'constraints' => $options['multiple']
                 ? [new All(constraints: [$imageConstraint])]
                 : [$imageConstraint],
+            'attr' => [
+                'accept' => 'image/*',
+            ],
         ];
 
         if ($options['multiple']) {
-            $imageOptions['attr'] = [
-                'accept' => 'image/*',
-                'class' => 'image-multi-upload',
-            ];
+            $imageOptions['attr']['class'] = 'image-multi-upload';
+            $imageOptions['help'] = 'Tippen Sie hier, um die Kamera zu öffnen oder Fotos aus der Mediathek zu wählen.';
+        } else {
+            // Single-image flows: hint the rear camera when the OS supports it.
+            $imageOptions['attr']['capture'] = 'environment';
         }
 
         $builder->add('imageFile', FileType::class, $imageOptions);
@@ -77,7 +83,7 @@ class ContentType extends AbstractType
             $builder->add('audienceAll', CheckboxType::class, [
                 'mapped' => false,
                 'required' => false,
-                'label' => 'An alle zugewiesenen Benutzer ausspielen',
+                'label' => 'An alle zugewiesenen Kitas ausspielen',
                 'data' => $options['audience_all_default'],
                 'attr' => ['data-audience-all' => ''],
             ]);
@@ -88,7 +94,8 @@ class ContentType extends AbstractType
                 'multiple' => true,
                 'expanded' => true,
                 'required' => false,
-                'label' => 'Sichtbar für',
+                'label' => 'Sichtbar für ausgewählte Kitas',
+                'help' => 'Suche und wähle die Kitas, die diesen Inhalt im Slider sehen sollen.',
                 'choice_label' => 'username',
                 'choices' => $options['audience_choices'],
                 'data' => $options['audience_selected'],

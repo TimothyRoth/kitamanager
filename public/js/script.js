@@ -133,8 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const apply = () => {
                     const display = input.checked ? 'none' : '';
+                    // Prefer the modern picker shell; fall back to list + legacy filter sibling.
+                    const picker = target.classList?.contains('choice-list')
+                        ? target.closest('.choice-picker')
+                        : null;
+                    if (picker) {
+                        picker.style.display = display;
+                        return;
+                    }
                     target.style.display = display;
-                    // Also hide a filter input rendered right before the list.
                     const sibling = target.previousElementSibling;
                     if (sibling && sibling.classList.contains('choice-filter')) {
                         sibling.style.display = display;
@@ -147,31 +154,110 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Add a quick client-side filter above long choice lists (e.g. assigning
-    // a user to hundreds of others) so they stay usable at scale.
+    // Choice picker for long Kita/audience lists: search, counts, bulk select.
     const initChoiceFilter = () => {
         document.querySelectorAll('.choice-list').forEach(list => {
             if (list.dataset.filterInitialized === 'true') return;
 
             const items = Array.from(list.querySelectorAll('.form-check'));
-            if (items.length < 8) return;
-
             list.dataset.filterInitialized = 'true';
+
+            // Compact chip layout for every list; toolbar only when it scales.
+            items.forEach(item => {
+                const label = item.querySelector('.form-check-label');
+                if (!label || item.querySelector('.choice-avatar')) return;
+                const name = label.textContent.trim();
+                if (!name) return;
+                const avatar = document.createElement('span');
+                avatar.className = 'choice-avatar';
+                avatar.setAttribute('aria-hidden', 'true');
+                avatar.textContent = name.charAt(0).toUpperCase();
+                item.insertBefore(avatar, label);
+            });
+
+            if (items.length < 6) return;
+
+            const shell = document.createElement('div');
+            shell.className = 'choice-picker';
+            list.parentNode.insertBefore(shell, list);
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'choice-picker-toolbar';
 
             const filter = document.createElement('input');
             filter.type = 'search';
             filter.className = 'choice-filter';
-            filter.placeholder = 'Liste filtern…';
-            filter.setAttribute('aria-label', 'Liste filtern');
-            list.parentNode.insertBefore(filter, list);
+            filter.placeholder = 'Kita suchen…';
+            filter.setAttribute('aria-label', 'Kita suchen');
+            filter.autocomplete = 'off';
+
+            const meta = document.createElement('p');
+            meta.className = 'choice-picker-meta';
+
+            const actions = document.createElement('div');
+            actions.className = 'choice-picker-actions';
+
+            const selectVisible = document.createElement('button');
+            selectVisible.type = 'button';
+            selectVisible.className = 'btn-link';
+            selectVisible.textContent = 'Sichtbare auswählen';
+
+            const clearSelection = document.createElement('button');
+            clearSelection.type = 'button';
+            clearSelection.className = 'btn-link';
+            clearSelection.textContent = 'Auswahl leeren';
+
+            actions.append(selectVisible, clearSelection);
+            toolbar.append(filter, actions, meta);
+            shell.append(toolbar, list);
+
+            const visibleItems = () => items.filter(item => item.style.display !== 'none');
+
+            const refreshMeta = () => {
+                const visible = visibleItems();
+                const selected = items.filter(item => {
+                    const input = item.querySelector('input[type="checkbox"], input[type="radio"]');
+                    return input && input.checked;
+                }).length;
+                const query = filter.value.trim();
+                meta.textContent = query
+                    ? `${visible.length} von ${items.length} angezeigt · ${selected} ausgewählt`
+                    : `${items.length} Kitas · ${selected} ausgewählt`;
+            };
 
             filter.addEventListener('input', () => {
                 const query = filter.value.trim().toLowerCase();
                 items.forEach(item => {
-                    const matches = item.textContent.trim().toLowerCase().includes(query);
+                    const matches = !query || item.textContent.trim().toLowerCase().includes(query);
                     item.style.display = matches ? '' : 'none';
                 });
+                refreshMeta();
             });
+
+            selectVisible.addEventListener('click', () => {
+                visibleItems().forEach(item => {
+                    const input = item.querySelector('input[type="checkbox"]');
+                    if (input && !input.disabled) {
+                        input.checked = true;
+                        input.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                });
+                refreshMeta();
+            });
+
+            clearSelection.addEventListener('click', () => {
+                items.forEach(item => {
+                    const input = item.querySelector('input[type="checkbox"]');
+                    if (input && !input.disabled) {
+                        input.checked = false;
+                        input.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                });
+                refreshMeta();
+            });
+
+            list.addEventListener('change', refreshMeta);
+            refreshMeta();
         });
     };
 
@@ -432,6 +518,16 @@ document.addEventListener('DOMContentLoaded', () => {
         xhr.send(formData);
     });
 
+    // Append ?uploaded=N while preserving an optional #fragment on the success URL.
+    const buildUploadSuccessUrl = (successUrl, uploadedCount) => {
+        const hashIndex = successUrl.indexOf('#');
+        const hash = hashIndex >= 0 ? successUrl.slice(hashIndex) : '';
+        const base = hashIndex >= 0 ? successUrl.slice(0, hashIndex) : successUrl;
+        const separator = base.includes('?') ? '&' : '?';
+
+        return base + separator + 'uploaded=' + uploadedCount + hash;
+    };
+
     // Bulk upload: send the images ONE BY ONE to the JSON endpoint so the
     // server only ever processes a single image per request (OOM protection)
     // and each image can be downscaled with visible per-image feedback.
@@ -510,8 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (failures.length === 0) {
             ui.label.textContent = 'Fertig – Sie werden weitergeleitet…';
-            const separator = successUrl.includes('?') ? '&' : '?';
-            window.location.href = successUrl + separator + 'uploaded=' + uploadedCount;
+            window.location.href = buildUploadSuccessUrl(successUrl, uploadedCount);
             return;
         }
 

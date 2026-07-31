@@ -40,15 +40,16 @@ class UserType extends AbstractType
         ]);
 
         $builder->add('publishToAll', CheckboxType::class, [
-            'label' => 'Alle Benutzer zuweisen',
+            'label' => 'Allen Kitas zuweisen',
             'required' => false,
-            'help' => 'Inhalte dieses Benutzers können an alle (auch zukünftige) Benutzer ausgespielt werden.',
+            'help' => 'Inhalte dieses Benutzers können an alle (auch zukünftige) Kitas ausgespielt werden.',
         ]);
 
         $currentUserId = $options['current_user_id'];
         $builder->add('publishTargets', EntityType::class, [
             'class' => User::class,
-            'label' => 'Zugewiesene Benutzer',
+            'label' => 'Zugewiesene Kitas',
+            'help' => 'Nur diese Kitas können Inhalte von diesem Benutzer empfangen.',
             'multiple' => true,
             'expanded' => true,
             'by_reference' => false,

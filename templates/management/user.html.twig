@@ -24,202 +24,234 @@
         {% if uploadedCount > 0 %}
             <div class="alert alert-success">
                 {{ uploadedCount }} Bild(er) erfolgreich hochgeladen!
+                Prüfen Sie unten die Reihenfolge in „Mein Slider“.
+                Änderungen erscheinen auf dem Fernseher in Kürze.
             </div>
         {% endif %}
 
-        <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Einstellungen</h2>
-            {{ form_start(durationForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
-            <div class="form-group">
-                {{ form_row(durationForm.durationBetweenSlides) }}
-            </div>
-            <button type="submit" class="btn btn-primary">Dauer speichern</button>
-            {{ form_end(durationForm) }}
-        </div>
+        {# ---------------------------------------------------------------- #}
+        {#  Einstellungen (selten) – zugeklappt, über Schnellaktionen       #}
+        {# ---------------------------------------------------------------- #}
+        {% set settingsOpen = not durationForm.vars.valid or not passwordForm.vars.valid %}
+        <details class="settings-accordion surface" style="margin-top: var(--spacing-xl);"{% if settingsOpen %} open{% endif %}>
+            <summary class="settings-accordion-summary">
+                <h2>Einstellungen &amp; Sicherheit</h2>
+                <span class="settings-accordion-hint">Slide-Dauer und Passwort</span>
+            </summary>
+            <div class="settings-accordion-body">
+                <div class="settings-block">
+                    <h3>Dauer zwischen den Slides</h3>
+                    {{ form_start(durationForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
+                    <div class="form-group">
+                        {{ form_row(durationForm.durationBetweenSlides) }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Dauer speichern</button>
+                    {{ form_end(durationForm) }}
+                </div>
 
-        <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Passwort ändern</h2>
-            {{ form_start(passwordForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
-            <div class="form-group">
-                {{ form_row(passwordForm.currentPassword) }}
+                <div class="settings-block">
+                    <h3>Passwort ändern</h3>
+                    {{ form_start(passwordForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
+                    <div class="form-group">
+                        {{ form_row(passwordForm.currentPassword) }}
+                    </div>
+                    <div class="form-group">
+                        {{ form_row(passwordForm.newPassword) }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Passwort speichern</button>
+                    {{ form_end(passwordForm) }}
+                </div>
             </div>
-            <div class="form-group">
-                {{ form_row(passwordForm.newPassword) }}
-            </div>
-            <button type="submit" class="btn btn-primary">Passwort speichern</button>
-            {{ form_end(passwordForm) }}
-        </div>
+        </details>
 
         {# ---------------------------------------------------------------- #}
-        {#  Meine Inhalte (selbst erstellt) #}
+        {#  Schnellaktionen – Kernjob ohne Scroll #}
         {# ---------------------------------------------------------------- #}
-        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
-            <h2 style="margin-bottom: 0;">Meine Inhalte</h2>
-            <div class="actions-bar" style="margin-bottom: 0;">
-                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder hinzufügen</a>
-                <a href="{{ path('app_management_create_article') }}" class="btn btn-primary">Artikel hinzufügen</a>
-                <form id="bulkDeleteForm" method="post"
-                      action="{{ path('app_management_bulk_delete_content') }}"
-                      data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt."
-                      data-turbo-scroll="false">
-                    <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
-                    <input type="hidden" name="_redirect" value="app_management_user">
-                    <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
-                </form>
+        <div class="surface quick-actions" style="margin-top: var(--spacing-xl);">
+            <h2 class="quick-actions-title">Schnellaktionen</h2>
+            <div class="actions-bar quick-actions-bar" style="margin-bottom: 0;">
+                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Fotos hinzufügen</a>
+                <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel hinzufügen</a>
+                <a href="{{ path('app_slider') }}" class="btn btn-secondary">Vorschau anzeigen</a>
             </div>
-        </div>
-
-        <div class="data-list">
-            <div class="data-row data-header">
-                <div class="data-cell cell-checkbox cell-checkbox-col">
-                    <input type="checkbox" data-bulk-select-all title="Alle auswählen">
-                </div>
-                <div class="data-cell">Typ</div>
-                <div class="data-cell" style="flex: 2;">Titel/Bild</div>
-                <div class="data-cell">Zielgruppe</div>
-                <div class="data-cell cell-actions">Aktionen</div>
-            </div>
-
-            {% for content in contents %}
-                <div class="data-row">
-                    <div class="data-cell cell-checkbox cell-checkbox-col">
-                        <span class="data-cell-label">Auswählen</span>
-                        <input type="checkbox" class="bulk-checkbox" name="ids[]"
-                               value="{{ content.id }}" form="bulkDeleteForm">
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Typ</span>
-                        {{ content.type.getGermanLabel() }}
-                    </div>
-                    <div class="data-cell" style="flex: 2;">
-                        <span class="data-cell-label">Titel/Bild</span>
-                        {% if content.type.value == 'article' %}
-                            {{ content.title }}
-                        {% else %}
-                            <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
-                        {% endif %}
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Zielgruppe</span>
-                        {% if content.audienceAll %}
-                            Alle zugewiesenen
-                        {% elseif content.sliderItems|length > 1 %}
-                            {{ content.sliderItems|length - 1 }} weitere
-                        {% else %}
-                            Nur ich
-                        {% endif %}
-                    </div>
-                    <div class="data-cell cell-actions">
-                        <a href="{{ path('app_management_edit_content', {'id': content.id}) }}"
-                           class="btn btn-link">Bearbeiten</a>
-                        <form class="form-inline" method="post"
-                              action="{{ path('app_management_delete_content', {'id': content.id}) }}"
-                              data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt."
-                              data-turbo-scroll="false">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
-                            <button type="submit" class="btn-link text-danger">Löschen</button>
-                        </form>
-                    </div>
-                </div>
-            {% else %}
-                <div class="data-empty">Sie haben noch keine Inhalte erstellt.</div>
-            {% endfor %}
         </div>
 
         {# ---------------------------------------------------------------- #}
         {#  Mein Slider (was mir ausgespielt wird) #}
         {# ---------------------------------------------------------------- #}
-        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
-            <div class="header-actions">
-                <h2 style="margin-bottom: 0;">Mein Slider</h2>
-                <span>(<a href="{{ path('app_slider') }}" class="btn-link">zum Slider</a>)</span>
+        <div id="mein-slider" class="section-anchor">
+            <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+                <div class="header-actions">
+                    <h2 style="margin-bottom: 0;">Mein Slider</h2>
+                    <a href="{{ path('app_slider') }}" class="btn btn-secondary">Vorschau</a>
+                </div>
+            </div>
+
+            <div class="data-list data-list-slider">
+                <div class="data-row data-header">
+                    {% if sliderItems|length > 1 %}
+                        <div class="data-cell cell-order">Reihenfolge</div>
+                    {% endif %}
+                    <div class="data-cell">Typ</div>
+                    <div class="data-cell" style="flex: 2;">Titel/Bild</div>
+                    <div class="data-cell">Quelle</div>
+                    <div class="data-cell">Status</div>
+                </div>
+
+                {% for item in sliderItems %}
+                    {% set content = item.content %}
+                    <div class="data-row {{ not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
+                        {% if sliderItems|length > 1 %}
+                            <div class="data-cell cell-order">
+                                <span class="data-cell-label">Reihenfolge</span>
+                                <div class="table-actions">
+                                    {% if not loop.first %}
+                                        <form class="form-inline" method="post"
+                                              action="{{ path('app_management_slider_move_up', {'id': item.id}) }}"
+                                              data-turbo="false" data-preserve-scroll>
+                                            <input type="hidden" name="_token"
+                                                   value="{{ csrf_token('move-up' ~ item.id) }}">
+                                            <button type="submit" class="btn-icon" title="Nach oben"
+                                                    aria-label="Nach oben">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z"/></svg>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    {% if not loop.last %}
+                                        <form class="form-inline" method="post"
+                                              action="{{ path('app_management_slider_move_down', {'id': item.id}) }}"
+                                              data-turbo="false" data-preserve-scroll>
+                                            <input type="hidden" name="_token"
+                                                   value="{{ csrf_token('move-down' ~ item.id) }}">
+                                            <button type="submit" class="btn-icon" title="Nach unten"
+                                                    aria-label="Nach unten">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20l8-8h-6v-8h-4v8h-6z"/></svg>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="data-cell">
+                            <span class="data-cell-label">Typ</span>
+                            {{ content.type.getGermanLabel() }}
+                        </div>
+                        <div class="data-cell" style="flex: 2;">
+                            <span class="data-cell-label">Titel/Bild</span>
+                            {% if content.type.value == 'article' %}
+                                {{ content.title }}
+                            {% else %}
+                                <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
+                            {% endif %}
+                        </div>
+                        <div class="data-cell">
+                            <span class="data-cell-label">Quelle</span>
+                            {% if content.creator and content.creator.id == app.user.id %}
+                                Eigener Inhalt
+                            {% else %}
+                                von {{ content.creator ? content.creator.username : 'unbekannt' }}
+                            {% endif %}
+                        </div>
+                        <div class="data-cell">
+                            <span class="data-cell-label">Status</span>
+                            <form class="form-inline" method="post"
+                                  action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
+                                  data-turbo="false" data-preserve-scroll>
+                                <input type="hidden" name="_token"
+                                       value="{{ csrf_token('toggle-status' ~ item.id) }}">
+                                <button type="submit"
+                                        class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
+                                        title="Tippen, um den Status zu ändern"
+                                        aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
+                                    <span class="status-toggle-dot" aria-hidden="true"></span>
+                                    {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
+                                </button>
+                                <span class="status-toggle-hint">Zum Umschalten tippen</span>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="data-empty">Ihr Slider enthält noch keine Inhalte.</div>
+                {% endfor %}
             </div>
         </div>
 
-        <div class="data-list">
-            <div class="data-row data-header">
-                {% if sliderItems|length > 1 %}
-                    <div class="data-cell cell-order">Reihenfolge</div>
-                {% endif %}
-                <div class="data-cell">Typ</div>
-                <div class="data-cell" style="flex: 2;">Titel/Bild</div>
-                <div class="data-cell">Quelle</div>
-                <div class="data-cell">Status</div>
+        {# ---------------------------------------------------------------- #}
+        {#  Meine Inhalte (selbst erstellt) #}
+        {# ---------------------------------------------------------------- #}
+        <div id="meine-inhalte" class="section-anchor">
+            <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
+                <h2 style="margin-bottom: 0;">Meine Inhalte</h2>
+                <div class="actions-bar" style="margin-bottom: 0;">
+                    <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Fotos hinzufügen</a>
+                    <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel hinzufügen</a>
+                    <form id="bulkDeleteForm" method="post"
+                          action="{{ path('app_management_bulk_delete_content') }}"
+                          data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt."
+                          data-turbo-scroll="false">
+                        <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
+                        <input type="hidden" name="_redirect" value="app_management_user">
+                        <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
+                    </form>
+                </div>
             </div>
 
-            {% for item in sliderItems %}
-                {% set content = item.content %}
-                <div class="data-row {{ not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
-                    {% if sliderItems|length > 1 %}
-                        <div class="data-cell cell-order">
-                            <span class="data-cell-label">Reihenfolge</span>
-                            <div class="table-actions">
-                                {% if not loop.first %}
-                                    <form class="form-inline" method="post"
-                                          action="{{ path('app_management_slider_move_up', {'id': item.id}) }}"
-                                          data-turbo="false" data-preserve-scroll>
-                                        <input type="hidden" name="_token"
-                                               value="{{ csrf_token('move-up' ~ item.id) }}">
-                                        <button type="submit" class="btn-icon" title="Nach oben">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z"/></svg>
-                                        </button>
-                                    </form>
-                                {% endif %}
-                                {% if not loop.last %}
-                                    <form class="form-inline" method="post"
-                                          action="{{ path('app_management_slider_move_down', {'id': item.id}) }}"
-                                          data-turbo="false" data-preserve-scroll>
-                                        <input type="hidden" name="_token"
-                                               value="{{ csrf_token('move-down' ~ item.id) }}">
-                                        <button type="submit" class="btn-icon" title="Nach unten">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20l8-8h-6v-8h-4v8h-6z"/></svg>
-                                        </button>
-                                    </form>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endif %}
-                    <div class="data-cell">
-                        <span class="data-cell-label">Typ</span>
-                        {{ content.type.getGermanLabel() }}
+            <div class="data-list data-list-content">
+                <div class="data-row data-header">
+                    <div class="data-cell cell-checkbox cell-checkbox-col">
+                        <input type="checkbox" data-bulk-select-all title="Alle auswählen">
                     </div>
-                    <div class="data-cell" style="flex: 2;">
-                        <span class="data-cell-label">Titel/Bild</span>
-                        {% if content.type.value == 'article' %}
-                            {{ content.title }}
-                        {% else %}
-                            <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
-                        {% endif %}
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Quelle</span>
-                        {% if content.creator and content.creator.id == app.user.id %}
-                            Eigener Inhalt
-                        {% else %}
-                            von {{ content.creator ? content.creator.username : 'unbekannt' }}
-                        {% endif %}
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Status</span>
-                        <form class="form-inline" method="post"
-                              action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
-                              data-turbo="false" data-preserve-scroll>
-                            <input type="hidden" name="_token"
-                                   value="{{ csrf_token('toggle-status' ~ item.id) }}">
-                            <button type="submit"
-                                    class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
-                                    title="Tippen, um den Status zu ändern"
-                                    aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
-                                <span class="status-toggle-dot" aria-hidden="true"></span>
-                                {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
-                            </button>
-                            <span class="status-toggle-hint">Zum Umschalten tippen</span>
-                        </form>
-                    </div>
+                    <div class="data-cell">Typ</div>
+                    <div class="data-cell" style="flex: 2;">Titel/Bild</div>
+                    <div class="data-cell">Zielgruppe</div>
+                    <div class="data-cell cell-actions">Aktionen</div>
                 </div>
-            {% else %}
-                <div class="data-empty">Ihr Slider enthält noch keine Inhalte.</div>
-            {% endfor %}
+
+                {% for content in contents %}
+                    <div class="data-row">
+                        <div class="data-cell cell-checkbox cell-checkbox-col">
+                            <span class="data-cell-label">Auswählen</span>
+                            <input type="checkbox" class="bulk-checkbox" name="ids[]"
+                                   value="{{ content.id }}" form="bulkDeleteForm">
+                        </div>
+                        <div class="data-cell">
+                            <span class="data-cell-label">Typ</span>
+                            {{ content.type.getGermanLabel() }}
+                        </div>
+                        <div class="data-cell" style="flex: 2;">
+                            <span class="data-cell-label">Titel/Bild</span>
+                            {% if content.type.value == 'article' %}
+                                {{ content.title }}
+                            {% else %}
+                                <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
+                            {% endif %}
+                        </div>
+                        <div class="data-cell">
+                            <span class="data-cell-label">Zielgruppe</span>
+                            {% if content.audienceAll %}
+                                Alle zugewiesenen
+                            {% elseif content.sliderItems|length > 1 %}
+                                {{ content.sliderItems|length - 1 }} weitere
+                            {% else %}
+                                Nur ich
+                            {% endif %}
+                        </div>
+                        <div class="data-cell cell-actions">
+                            <a href="{{ path('app_management_edit_content', {'id': content.id}) }}"
+                               class="btn btn-link">Bearbeiten</a>
+                            <form class="form-inline" method="post"
+                                  action="{{ path('app_management_delete_content', {'id': content.id}) }}"
+                                  data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt."
+                                  data-turbo-scroll="false">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
+                                <button type="submit" class="btn-link text-danger">Löschen</button>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="data-empty">Sie haben noch keine Inhalte erstellt.</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 {% endblock %}

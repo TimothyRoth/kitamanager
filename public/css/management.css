@@ -7,8 +7,7 @@
  *
  * Layout bands:
  *   ≤ 819px   phones / narrow – stacked cards, full-width actions
- *   820–1279  iPad 2025 (both orientations) – stacked cards, roomy controls
- *   ≥ 1280px  desktop monitors – compact dense rows
+ *   ≥ 820px   iPad landscape+ / desktop – compact horizontal item rows
  *
  * Scoped to body.management so TV slider pages stay untouched.
  */
@@ -115,10 +114,26 @@ body.management .form-check {
 }
 
 body.management .choice-list {
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-    max-height: 22rem;
-    gap: var(--spacing-sm) var(--spacing-md);
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    max-height: 24rem;
+    gap: var(--spacing-sm);
     -webkit-overflow-scrolling: touch;
+}
+
+body.management .choice-picker .choice-list {
+    max-height: 28rem;
+}
+
+body.management .choice-picker-toolbar .btn-link {
+    min-height: 2.25rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-bg);
+    border-radius: var(--border-radius);
+}
+
+body.management .choice-filter {
+    min-height: var(--touch-target);
 }
 
 body.management .image-preview-remove {
@@ -149,7 +164,11 @@ body.management .image-preview-grid img {
 }
 
 body.management .thumbnail {
-    max-width: 7.5rem;
+    max-width: 4rem;
+    max-height: 4rem;
+    width: auto;
+    height: auto;
+    object-fit: cover;
     border-radius: var(--border-radius);
 }
 
@@ -162,7 +181,29 @@ body.management .current-image-preview {
 }
 
 body.management .table-actions {
-    gap: var(--spacing-sm);
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0;
+}
+
+body.management .table-actions .form-inline {
+    display: inline-flex;
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+/* Compact reorder controls so both arrows stay in the order column */
+body.management .cell-order .btn-icon {
+    min-width: 2rem;
+    min-height: 2.25rem;
+    padding: 0.15rem;
+}
+
+body.management .cell-order .btn-icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
 }
 
 body.management .btn-block {
@@ -182,12 +223,83 @@ body.management .surface > div > .btn-link {
     background-color: var(--color-surface);
 }
 
+body.management .quick-actions-title {
+    margin-bottom: var(--spacing-md);
+}
+
+body.management .quick-actions-bar .btn-primary {
+    flex: 1 1 12rem;
+}
+
+body.management .section-anchor {
+    scroll-margin-top: var(--spacing-lg);
+}
+
+body.management .settings-accordion {
+    padding: 0;
+}
+
+body.management .settings-accordion-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: var(--spacing-lg);
+    cursor: pointer;
+    list-style: none;
+    min-height: var(--touch-target);
+}
+
+body.management .settings-accordion-summary::-webkit-details-marker {
+    display: none;
+}
+
+body.management .settings-accordion-summary h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+body.management .settings-accordion-hint {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+}
+
+body.management .settings-accordion-summary::after {
+    content: 'Öffnen';
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-top: var(--spacing-sm);
+}
+
+body.management .settings-accordion[open] > .settings-accordion-summary::after {
+    content: 'Schließen';
+}
+
+body.management .settings-accordion-body {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+body.management .settings-block {
+    padding-top: var(--spacing-lg);
+}
+
+body.management .settings-block h3 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1.05rem;
+}
+
+body.management .settings-block + .settings-block {
+    margin-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
 /* ------------------------------------------------------------------ */
-/*  iPad 2025 + phones (≤1279): stacked cards – never dense rows       */
-/*  Landscape iPad is 1180 CSS px wide and must stay in this band.     */
+/*  Narrow (≤819): stacked cards                                      */
+/*  Wide enough (≥820, iPad landscape+): compact horizontal item rows  */
 /* ------------------------------------------------------------------ */
 
-@media (max-width: 1279px) {
+@media (max-width: 819px) {
     body.management .data-header {
         display: none;
     }
@@ -257,10 +369,7 @@ body.management .surface > div > .btn-link {
     body.management .page-header {
         align-items: flex-start;
     }
-}
 
-/* Portrait iPad / phones: stack section actions full width */
-@media (max-width: 819px) {
     body.management .actions-bar {
         flex-direction: column;
         align-items: stretch;
@@ -276,8 +385,8 @@ body.management .surface > div > .btn-link {
     }
 }
 
-/* iPad landscape (and similar widths): keep actions in a wrap row */
-@media (min-width: 820px) and (max-width: 1279px) {
+/* Compact side-by-side fields within each slider/content item */
+@media (min-width: 820px) {
     body.management .section-header {
         align-items: center;
     }
@@ -297,26 +406,10 @@ body.management .surface > div > .btn-link {
         width: auto;
     }
 
-    body.management .data-list {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--spacing-md);
-    }
-
-    body.management .data-list > .data-empty {
-        grid-column: 1 / -1;
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Desktop (≥1280): compact dense rows for mouse / keyboard           */
-/* ------------------------------------------------------------------ */
-
-@media (min-width: 1280px) {
-    body.management .data-row {
-        flex-direction: row;
-        align-items: center;
-        padding: var(--spacing-sm) var(--spacing-md);
+    body.management .data-list-content,
+    body.management .data-list-slider {
+        display: flex;
+        flex-direction: column;
         gap: var(--spacing-sm);
     }
 
@@ -331,34 +424,89 @@ body.management .surface > div > .btn-link {
         z-index: 2;
     }
 
+    body.management .data-row {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        padding: var(--spacing-sm) var(--spacing-md);
+        gap: var(--spacing-sm);
+    }
+
     body.management .data-cell {
         display: block;
+        padding: 0;
+        min-width: 0;
+    }
+
+    body.management .data-cell + .data-cell {
+        border-top: none;
     }
 
     body.management .data-cell-label {
         display: none;
     }
 
-    body.management .cell-actions {
-        justify-content: flex-end;
-        flex: 0 1 auto;
-        min-width: 14rem;
+    body.management .cell-order {
+        flex: 0 0 6.5rem;
+        max-width: 6.5rem;
+    }
+
+    body.management .cell-checkbox-col {
+        flex: 0 0 auto;
     }
 
     body.management .cell-checkbox {
         justify-content: center;
     }
 
-    body.management .cell-order {
-        flex: 0 0 7rem;
+    body.management .cell-actions {
+        justify-content: flex-end;
+        flex: 0 1 auto;
+        min-width: 10rem;
+        width: auto;
     }
 
-    body.management .data-row:not(.data-header):hover {
-        background-color: var(--color-bg);
+    body.management .cell-actions .btn-link,
+    body.management .cell-actions button.btn-link {
+        flex: 0 1 auto;
+    }
+
+    body.management .cell-actions .form-inline {
+        display: inline-flex;
+        flex: 0 0 auto;
+        margin: 0;
+    }
+
+    body.management .cell-actions .form-inline .btn-link {
+        width: auto;
+    }
+
+    body.management .thumbnail {
+        max-width: 3.25rem;
+        max-height: 3.25rem;
     }
 
     body.management .status-toggle-hint {
         display: none;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Desktop (≥1280): slightly denser controls for mouse / keyboard     */
+/* ------------------------------------------------------------------ */
+
+@media (min-width: 1280px) {
+    body.management .data-row:not(.data-header):hover {
+        background-color: var(--color-bg);
+    }
+
+    body.management .cell-actions {
+        min-width: 14rem;
+    }
+
+    body.management .cell-order {
+        flex: 0 0 7rem;
+        max-width: 7rem;
     }
 
     /* Slightly tighter controls – desktop doesn't need 44px everywhere */
