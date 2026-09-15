@@ -42,6 +42,9 @@ class CreateAdminUserCommand extends Command
         $user = new User();
         $user->setUsername($username);
         $user->setRoles(['ROLE_ADMIN']);
+        // Admins create central content for all Kitas; without this flag
+        // allowedTargetUsers() stays empty and uploads land on "0 Kitas".
+        $user->setPublishToAll(true);
 
         $hashedPassword = $this->passwordHasher->hashPassword(
             $user,
