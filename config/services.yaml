@@ -10,6 +10,11 @@ parameters:
     uploads_directory: '%kernel.project_dir%/public/uploads'
     # Default when ASSET_VERSION is unset; "auto" → git short hash via GitAssetVersionEnvVarProcessor.
     env(ASSET_VERSION): 'auto'
+    # Host separation (empty = disabled, single-domain mode).
+    env(DISPLAY_HOST): ''
+    env(MANAGEMENT_HOST): ''
+    app.display_host: '%env(string:DISPLAY_HOST)%'
+    app.management_host: '%env(string:MANAGEMENT_HOST)%'
 
 services:
     # default configuration for services in *this* file
