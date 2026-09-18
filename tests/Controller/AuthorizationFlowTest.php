@@ -114,7 +114,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     private function loginForm(string $username, string $password): void
     {
-        $crawler = $this->client->request('GET', '/login');
+        $crawler = $this->client->request('GET', '/admin');
         $form = $crawler->selectButton('Anmelden')->form([
             '_username' => $username,
             '_password' => $password,
@@ -128,7 +128,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
     {
         $this->loginForm('admin', 'wrong-password');
 
-        self::assertResponseRedirects('/login');
+        self::assertResponseRedirects('/admin');
         $this->client->followRedirect();
         self::assertSelectorExists('.alert-danger');
         self::assertSelectorTextContains('body', 'Anmelden');
@@ -179,7 +179,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
         $this->client->request('GET', '/management/admin');
         self::assertResponseRedirects();
-        self::assertStringContainsString('/login', $this->client->getResponse()->headers->get('Location') ?? '');
+        self::assertStringContainsString('/admin', $this->client->getResponse()->headers->get('Location') ?? '');
     }
 
     // --- Benutzerverwaltung (Admin) ----------------------------------------

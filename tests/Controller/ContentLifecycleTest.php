@@ -257,7 +257,7 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertResponseRedirects('/management/user');
 
         $this->client->restart();
-        $crawler = $this->client->request('GET', '/login');
+        $crawler = $this->client->request('GET', '/admin');
         $login = $crawler->selectButton('Anmelden')->form([
             '_username' => 'kita-a',
             '_password' => 'brand-new',
