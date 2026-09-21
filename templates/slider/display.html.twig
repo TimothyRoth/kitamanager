@@ -2,13 +2,11 @@
 
 {% block title %}PIN eingeben{% endblock %}
 
-{# TV pages: ES5-only tv.js, no Turbo/importmap, no management.css (avoids
-   modern selectors such as :has() that some TV engines reject). #}
+{# TV pages: ES5-only tv.js, no Turbo/importmap. CSS is a dedicated tv.css
+   without custom properties / Grid (Philips TPM181HE Chrome/49 reports both
+   as unsupported). #}
 {% block stylesheets %}
-    <link rel="stylesheet" href="{{ asset('css/basics.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/components.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/tv.css') }}">
 {% endblock %}
 {% block app_javascripts %}
     <script src="{{ asset('js/tv.js') }}" defer></script>

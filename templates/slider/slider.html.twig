@@ -2,11 +2,10 @@
 
 {% block title %}Slider{% endblock %}
 
-{# TV pages: ES5-only tv.js, no Turbo/importmap, lean CSS for old engines. #}
+{# TV pages: ES5-only tv.js, no Turbo/importmap. tv.css has no CSS variables /
+   Grid; slider.css already uses literal colors for the kiosk viewport. #}
 {% block stylesheets %}
-    <link rel="stylesheet" href="{{ asset('css/basics.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/components.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/tv.css') }}">
     <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
 {% endblock %}
 {% block app_javascripts %}

@@ -1,0 +1,108 @@
+/*
+ * TV / SmartInfo stylesheet (PIN + slider shell).
+ *
+ * Target: Philips Professional (e.g. 65BFL2214, TPM181HE) — Chrome/49-class
+ * OMI engine. Feature tests on device report:
+ *   - CSS Custom Properties: NO  → no var(--*), no :root tokens
+ *   - CSS Grid: NO               → flex / block only
+ *   - Flexbox: YES
+ *   - gap: unreliable            → margins instead
+ *
+ * Keep this file free of Grid, custom properties, :has(), clamp(), oklch(),
+ * and env(safe-area-*). Management CSS stays in the split files.
+ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+    line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+a {
+    color: #0f172a;
+    text-decoration: none;
+}
+
+p {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.container {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.surface {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+}
+
+.alert-danger {
+    color: #7f1d1d;
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.pin-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.pin-form > * {
+    margin-bottom: 1rem;
+}
+
+.pin-input {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    text-align: center;
+    max-width: 260px;
+    color: #0f172a;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
