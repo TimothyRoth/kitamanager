@@ -422,6 +422,15 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     // --- TV-Anzeige --------------------------------------------------------
 
+    public function testRootServesPinPageWithoutRedirect(): void
+    {
+        $this->client->request('GET', '/');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('input[name="pin"]');
+        self::assertSelectorTextContains('body', 'PIN');
+    }
+
     public function testCorrectPinLinksTvToSlider(): void
     {
         $crawler = $this->client->request('GET', '/slider/display');

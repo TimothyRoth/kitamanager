@@ -27,9 +27,13 @@ final class SliderController extends AbstractController
      * PIN no longer resolves (user changed or removed it), the device is
      * asked to enter the current PIN again.
      *
-     * NOTE: must be declared before the /slider/{slug?} route so that
+     * "/" is the same action (HTTP 200, no redirect): embedded Smart Info
+     * browsers often open only the bare domain and fail on 302 responses.
+     *
+     * NOTE: /slider/display must stay declared before /slider/{slug?} so that
      * "display" is not interpreted as a slug.
      */
+    #[Route('/', name: 'app_home', methods: ['GET', 'POST'])]
     #[Route('/slider/display', name: 'app_slider_display', methods: ['GET', 'POST'])]
     public function display(Request $request, UserRepository $userRepository): Response
     {
