@@ -2,8 +2,13 @@
 
 {% block title %}Slider{% endblock %}
 
-{# TV pages run on embedded TV browsers with old engines: load only the
-   ES5-safe tv.js and skip the modern script.js and Turbo (import maps). #}
+{# TV pages: ES5-only tv.js, no Turbo/importmap, lean CSS for old engines. #}
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('css/basics.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/components.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
+{% endblock %}
 {% block app_javascripts %}
     <script src="{{ asset('js/tv.js') }}" defer></script>
 {% endblock %}

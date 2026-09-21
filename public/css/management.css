@@ -216,6 +216,16 @@ body.management .login-surface {
     margin-right: auto;
 }
 
+/* Modern :has() – management UI only (kept out of components.css for TV engines) */
+body.management .image-preview-tile:has(.image-preview-status) .image-preview-badge {
+    display: none;
+}
+
+body.management .form-check:has(input:checked) {
+    border-color: var(--color-primary);
+    background-color: #f1f5f9;
+}
+
 body.management .page-header .btn-link,
 body.management .surface > .btn-link,
 body.management .surface > div > .btn-link {

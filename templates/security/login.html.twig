@@ -3,6 +3,12 @@
 {% block title %}Anmelden{% endblock %}
 {% block body_class %}management{% endblock %}
 
+{# Login must work on constrained browsers (e.g. Smart-TV browsers used for
+   kiosk checks): no ES6 script.js, no Turbo/Stimulus importmap. The form is
+   a plain HTML POST and does not need client-side JS. #}
+{% block app_javascripts %}{% endblock %}
+{% block importmap %}{% endblock %}
+
 {% block body %}
     <div class="container">
         <div class="surface login-surface">
@@ -23,17 +29,17 @@
                     <div class="form-group">
                         <label for="username">Benutzername</label>
                         <input type="text" value="{{ last_username }}" name="_username" id="username"
-                               autocomplete="username" required autofocus enterkeyhint="next"
+                               autocomplete="username" required autofocus
                                autocapitalize="none" autocorrect="off" spellcheck="false">
                     </div>
 
                     <div class="form-group">
                         <label for="password">Passwort</label>
                         <input type="password" name="_password" id="password" autocomplete="current-password"
-                               required enterkeyhint="go">
+                               required>
                     </div>
 
-                    <input type="hidden" name="_csrf_token" data-controller="csrf-protection"
+                    <input type="hidden" name="_csrf_token"
                            value="{{ csrf_token('authenticate') }}">
 
                     <button class="btn btn-primary btn-block" type="submit">

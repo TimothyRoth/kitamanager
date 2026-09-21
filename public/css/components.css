@@ -514,8 +514,7 @@ button.btn-link.text-danger:hover {
    e.g. "wird verkleinert" never sits on top of progress or error text. */
 .image-preview-tile.is-uploading .image-preview-badge,
 .image-preview-tile.is-done .image-preview-badge,
-.image-preview-tile.is-failed .image-preview-badge,
-.image-preview-tile:has(.image-preview-status) .image-preview-badge {
+.image-preview-tile.is-failed .image-preview-badge {
     display: none;
 }
 
@@ -729,11 +728,6 @@ button.btn-link.text-danger:hover {
 
 .form-check:hover {
     border-color: var(--color-text-muted);
-}
-
-.form-check:has(input:checked) {
-    border-color: var(--color-primary);
-    background-color: #f1f5f9;
 }
 
 .form-check input[type="checkbox"],

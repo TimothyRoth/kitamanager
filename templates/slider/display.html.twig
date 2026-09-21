@@ -2,10 +2,14 @@
 
 {% block title %}PIN eingeben{% endblock %}
 
-{# TV pages run on embedded TV browsers with old engines: load only the
-   ES5-safe tv.js and skip the modern script.js and Turbo (import maps).
-   The PIN form then submits as a plain (non-Turbo) POST, which renders the
-   422 error response like a normal page. #}
+{# TV pages: ES5-only tv.js, no Turbo/importmap, no management.css (avoids
+   modern selectors such as :has() that some TV engines reject). #}
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('css/basics.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/components.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
+{% endblock %}
 {% block app_javascripts %}
     <script src="{{ asset('js/tv.js') }}" defer></script>
 {% endblock %}
