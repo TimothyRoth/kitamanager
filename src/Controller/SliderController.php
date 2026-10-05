@@ -96,18 +96,22 @@ final class SliderController extends AbstractController
      * something actually changed (new/edited/removed/reordered content or a
      * changed slide duration).
      *
-     * Devices linked via PIN (recognisable by their cookie) are re-validated
-     * on every poll: when the PIN no longer belongs to the displayed user
-     * (admin changed or removed it), the device is sent back to the PIN page
-     * within one poll interval.
+     * Devices linked via PIN are re-validated on every poll: when the PIN no
+     * longer belongs to the displayed user (admin changed or removed it), the
+     * device is sent back to the PIN page within one poll interval.
+     *
+     * A browser that opens /slider/display directly sends the PIN cookie.
+     * A signage iframe on internal HTTP cannot keep that cookie (SameSite=None
+     * would require HTTPS), so the TV page stores the PIN itself and repeats
+     * it in the X-Display-Pin header.
      */
     #[Route('/slider/{slug}/content', name: 'app_slider_content', methods: ['GET'])]
     public function content(User $user, Request $request, SliderItemRepository $sliderItemRepository, UserRepository $userRepository): JsonResponse
     {
-        $cookiePin = $request->cookies->get(self::PIN_COOKIE);
+        $pin = $this->linkedPin($request);
 
-        if (null !== $cookiePin) {
-            $pinUser = $userRepository->findOneBy(['devicePin' => $cookiePin]);
+        if (null !== $pin) {
+            $pinUser = $userRepository->findOneBy(['devicePin' => $pin]);
 
             if (!$pinUser || $pinUser->getId() !== $user->getId()) {
                 return new JsonResponse(['unlinked' => true]);
@@ -131,10 +135,30 @@ final class SliderController extends AbstractController
             Cookie::create(self::PIN_COOKIE, $pin)
                 ->withExpires(new \DateTimeImmutable('+400 days'))
                 ->withPath('/')
+                ->withSecure(false)
                 ->withHttpOnly(true)
                 ->withSameSite(Cookie::SAMESITE_LAX)
         );
 
         return $response;
+    }
+
+    /**
+     * PIN from the first-party cookie, or from the header the iframe sends
+     * when the cookie was discarded. Empty values count as "not linked".
+     */
+    private function linkedPin(Request $request): ?string
+    {
+        $cookiePin = $request->cookies->get(self::PIN_COOKIE);
+        if (is_string($cookiePin) && '' !== $cookiePin) {
+            return $cookiePin;
+        }
+
+        $headerPin = $request->headers->get('X-Display-Pin');
+        if (is_string($headerPin) && 1 === preg_match('/^\d{4}$/', $headerPin)) {
+            return $headerPin;
+        }
+
+        return null;
     }
 }
