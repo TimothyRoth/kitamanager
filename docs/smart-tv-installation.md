@@ -2,73 +2,102 @@
 
 Jedes Gerät bekommt denselben Inhalt und darin dieselbe Adresse. Welche Kita läuft, entscheidet die PIN, die einmal am Fernseher eingegeben wird. Die Adresse ist intern und verwendet `http`, weil es kein Zertifikat gibt.
 
-## Wo der HTML-Code liegt
+Der Hersteller (PPDS / Philips B-Line) bestätigt den Weg: **Smartinfo-Content** anlegen und die Webseite im **HTML-Gadget per iframe** einbinden. Das ist ein Umweg gegenüber einer direkten Smart-Card-URL – und der richtige.
 
-Der Code liegt nicht als Datei auf dem Fernseher. Es gibt keinen Ordner, den man per Explorer, USB oder Anmeldung am Gerät füllt.
-
-Er steht in einem Inhalt, den du in der Software des Herstellers auf einem PC oder Tablet anlegst. Dieser Rechner und der Fernseher müssen im selben internen Netz sein. Die Software findet den Fernseher über seine IP-Adresse und schickt den Inhalt dorthin. Der Fernseher speichert den Inhalt und zeigt ihn nach dem Einschalten.
-
-Beim Philips B-Line (Beispiel 65BFL2214/12) heißt das so:
-
-- Inhalt bauen: **CMND & Create** auf einem Windows-PC, oder die App **PPDS Publisher** auf einem Tablet.
-- Fernseher ansprechen: **CMND & Control**, ebenfalls auf dem PC. Das Programm sieht die Geräte im lokalen Netz.
-- Inhaltstyp laut Hersteller: **Smartinfo-Content**.
-- Baustein darin: **HTML-Gadget**, bildschirmfüllend.
-
-Die Programme und die Menüpunkte stehen im Handbuch:
+Handbuch B-Line (Beispiel 65BFL2214/12):
 
 https://www.ppds.com/de-de/downloads/products/digital-signage/signage-2000-series--b-line-/65bfl2214-12
 
+## Was nicht funktioniert
+
+| Versuch | Ergebnis |
+|---|---|
+| Server-URL als **Smart Card** / Smart-Card-Quelle eintragen | „Smart card not available“ – Smart Card ist kein allgemeiner Webbrowser |
+| HTML-Gadget **per USB-Stick direkt auf den Fernseher** kopieren | Geht so nicht. Der TV hat keinen Ordner, den man per Stick, Explorer oder Anmeldung befüllt |
+| `https://…` auf die interne Domain | Scheitert ohne Zertifikat |
+| Feste Kita-URL `/slider/kita-…` für alle Geräte | Möglich, aber unnötig – dann bräuchte jedes Gerät einen anderen Inhalt |
+
+USB-Stick ist nur praktisch, um die HTML-Datei auf den **PC mit CMND** zu bringen (zum Kopieren in das Gadget). Der Stick ersetzt CMND nicht.
+
+## Richtiger Weg: Smartinfo + HTML-Gadget
+
+Der HTML-Code liegt in einem Inhalt, den du in der Hersteller-Software auf einem PC oder Tablet anlegst. Dieser Rechner und der Fernseher müssen im selben internen Netz sein. Die Software findet den Fernseher über seine IP und schickt den Inhalt dorthin. Der Fernseher speichert ihn und zeigt ihn nach dem Einschalten.
+
+Beim Philips B-Line:
+
+- Inhalt bauen: **CMND & Create** (Windows) oder **PPDS Publisher** (Tablet)
+- Fernseher ansprechen: **CMND & Control**
+- Inhaltstyp: **Smartinfo-Content**
+- Baustein: **HTML-Gadget**, bildschirmfüllend (1920×1080)
+
 Ablauf:
 
-1. Fernseher ins interne Netz hängen. Im Netzwerkmenü des Geräts die IP-Adresse ablesen.
-2. Den PC oder das Tablet ins gleiche Netz hängen. Er muss diese IP erreichen.
-3. CMND laut Handbuch installieren und den Fernseher darüber aufnehmen.
-4. Einen Smartinfo-Inhalt anlegen, ein HTML-Gadget auf die volle Fläche legen und den Code unten einfügen.
-5. Den Inhalt an den Fernseher senden und als Startinhalt nach dem Einschalten festlegen.
-6. Auf dem Bildschirm erscheint die PIN-Seite. Die vier Ziffern mit der Fernbedienung oder einer USB-Tastatur eingeben. Nach der vierten Ziffer startet der Slider.
+1. Fernseher ins interne Netz. IP-Adresse im Netzwerkmenü ablesen.
+2. PC/Tablet ins gleiche Netz – muss diese IP erreichen.
+3. CMND laut Handbuch installieren und den Fernseher aufnehmen.
+4. Smartinfo-Inhalt anlegen, HTML-Gadget auf die volle Fläche legen, Code unten einfügen (oder Inhalt aus `docs/smart-tv-html-gadget.html`).
+5. Inhalt per CMND & Control an den Fernseher senden und als **Startinhalt** nach dem Einschalten festlegen.
+6. PIN-Seite erscheint. Vier Ziffern mit Fernbedienung oder USB-Tastatur eingeben → Slider startet.
 
-Dieselbe Veröffentlichung gilt für jeden weiteren Fernseher. Nur die PIN am Gerät ist eine andere, wenn eine andere Kita gezeigt werden soll.
+Dieselbe Veröffentlichung für jeden weiteren Fernseher. Nur die PIN am Gerät ist eine andere, wenn eine andere Kita gezeigt werden soll.
 
-## Der Code, auf jedem Gerät gleich
+## Der Code (auf jedem Gerät gleich)
 
-`HIER-DIE-INTERNE-ADRESSE` durch den Namen oder die IP des Servers ersetzen, den der Fernseher erreicht. Zum Beispiel `kita-manager.intern` oder `192.168.1.50`.
+Hersteller-Demo (nur als Muster):
+
+```html
+<iframe width="1920" height="1080" src="https://kita-manager.timothy-roth.de/slider/kita-regenbogen" frameborder="0"></iframe>
+```
+
+Produktiv intern (DRK) – Abweichungen bewusst:
+
+- **`http`**, nicht `https`
+- **`/slider/display`**, nicht `/slider/kita-…` (PIN wählt die Kita)
+
+```html
+<iframe width="1920" height="1080" src="http://dpm.drk-coe.de/slider/display" frameborder="0"></iframe>
+```
+
+Fertige Datei: `docs/smart-tv-html-gadget.html` (vollständiges HTML um den iframe; im Gadget reicht oft auch nur die iframe-Zeile).
+
+DNS auf dem TV fehlt? Nur den Host ersetzen, Pfad bleibt:
 
 ```html
 <iframe width="1920" height="1080" src="http://HIER-DIE-INTERNE-ADRESSE/slider/display" frameborder="0"></iframe>
 ```
 
-Das ist immer `http://…/slider/display`. Kein `https`, kein Kita-Name in der Adresse. Eine `https`-Adresse scheitert, weil die interne Domain kein Zertifikat hat.
-
-Die Seite im Rahmen füllt die Fläche des Gadgets. Für die B-Line die vom Hersteller genannte Größe 1920×1080 lassen. Auf einem anderen Panel die Breite und Höhe der Inhaltsfläche eintragen, wenn das Gadget feste Pixel verlangt.
+Der Fernseher muss `http://dpm.drk-coe.de` (bzw. die Ersatzadresse) aus dem internen Netz erreichen.
 
 ## PIN
 
 In der Verwaltung hat jede Kita eine eigene vierstellige PIN. Am Fernseher wird sie einmal eingegeben. Das Gerät merkt sich die Zuordnung und zeigt danach den Slider dieser Kita, auch nach einem Neustart.
 
-Mehrere Fernseher dürfen dieselbe PIN haben, dann zeigen sie denselben Slider. Wird die PIN in der Verwaltung geändert oder gelöscht, erscheint auf den betroffenen Geräten wieder die Eingabe.
+Mehrere Fernseher dürfen dieselbe PIN haben → gleicher Slider. Wird die PIN in der Verwaltung geändert oder gelöscht, erscheint auf den betroffenen Geräten wieder die Eingabe.
 
-Die Zuordnung liegt im Speicher der eingebetteten Seite. Ein normales Cookie hält in diesem Rahmen ohne `https` nicht (und in Edge/Chromium oft auch nicht, wenn die Elternseite eine andere Domain hat), deshalb speichert die Anzeige die PIN selbst und sendet sie bei Bedarf erneut.
+Die Zuordnung liegt im Speicher der eingebetteten Seite. Ein normales Cookie hält in diesem iframe ohne `https` oft nicht, deshalb speichert die Anzeige die PIN selbst und sendet sie bei Bedarf erneut. Die PIN-Eingabe hängt nicht an einer Session/CSRF (nötig für Chromium/Edge im fremden Rahmen).
 
-Zum Testen am PC: eine lokale HTML-Datei (`file:///…`) darf den iframe einbetten. Dafür darf die App **kein** `Content-Security-Policy: frame-ancestors *` senden – `*` gilt nur für `http`/`https`, nicht für `file:`. Edge blockiert zudem Third-Party-Cookies im iframe strenger; die PIN-Eingabe hängt deshalb nicht an einer Session/CSRF. Am Fernseher denselben iframe-Code wie unten verwenden.
+## Test am PC
+
+Zum Ausprobieren darf eine lokale HTML-Datei (`file:///…`) denselben iframe einbetten. Die App darf dafür **kein** `Content-Security-Policy: frame-ancestors *` senden – `*` gilt nur für `http`/`https`, nicht für `file:`. Am Fernseher denselben iframe-Code verwenden; der Auslieferungsweg bleibt CMND (Smartinfo), nicht USB aufs Gerät.
 
 ## Andere Geräte
 
-Dasselbe Muster, andere Software: den Code in das HTML- oder Web-Widget des jeweiligen Inhaltsprogramms setzen, das Programm im selben Netz den Bildschirm finden lassen, Inhalt hinschicken, als Startinhalt setzen, PIN am Gerät eingeben.
+Dasselbe Muster, andere Software: Code ins HTML-/Web-Widget des Inhaltsprogramms, Programm im selben Netz den Bildschirm finden lassen, Inhalt senden, als Startinhalt setzen, PIN eingeben.
 
-Kann ein Gerät eine Startadresse direkt öffnen und braucht keinen HTML-Rahmen, nur diese Adresse eintragen:
+Kann ein Gerät eine Startadresse direkt öffnen und braucht keinen HTML-Rahmen:
 
 ```text
-http://HIER-DIE-INTERNE-ADRESSE/slider/display
+http://dpm.drk-coe.de/slider/display
 ```
 
-Der eingebaute Browser eines Wohnzimmer-Fernsehers ohne festen Startkanal eignet sich nicht. Dann einen Signage-Player oder ein Zusatzgerät nehmen und dort denselben Inhalt starten.
+Der eingebaute Browser eines Wohnzimmer-Fernsehers ohne festen Startkanal eignet sich nicht. Dann Signage-Player oder Zusatzgerät nehmen.
 
 ## Abnahme
 
-- Ein neues Gerät zeigt zuerst die PIN-Seite, nicht schon einen Slider.
+- Neues Gerät zeigt zuerst die PIN-Seite, nicht schon einen Slider.
 - Nach der PIN erscheint der Slider der zugehörigen Kita.
-- Ein zweites Gerät mit demselben Code und einer anderen PIN zeigt die andere Kita.
+- Zweites Gerät mit demselben Inhalt und anderer PIN zeigt die andere Kita.
 - Nach dem Ausschalten kommt derselbe Slider ohne erneute Eingabe.
-- Die Adresse beginnt mit `http://` und der Fernseher meldet keinen Zertifikatsfehler.
-- Eine Änderung in der Verwaltung ist nach etwa einer Minute auf dem Bildschirm sichtbar, ohne den Inhalt neu zu veröffentlichen.
+- Adresse beginnt mit `http://`, kein Zertifikatsfehler.
+- Änderung in der Verwaltung ist nach etwa einer Minute auf dem Bildschirm sichtbar, ohne den Inhalt neu zu veröffentlichen.
+- Kein „Smart card not available“ – Inhalt läuft als Smartinfo/HTML-Gadget, nicht als Smart Card.

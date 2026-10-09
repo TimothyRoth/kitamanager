@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Kita Manager TV</title>
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+    iframe { border: 0; display: block; width: 1920px; height: 1080px; }
+  </style>
+</head>
+<body>
+  <!--
+    Philips B-Line laut Hersteller:
+    CMND & Create → Smartinfo-Content → HTML-Gadget → iframe einfügen
+    → CMND & Control an den TV senden (Startinhalt).
+
+    Nicht als Smart-Card-URL eintragen („Smart card not available“).
+    Nicht per USB-Stick direkt auf den Fernseher kopieren — USB nur, um
+    diese Datei auf den CMND-PC zu bringen.
+
+    Produktiv: http + /slider/display (PIN wählt die Kita).
+    Siehe docs/smart-tv-installation.md
+  -->
+  <iframe width="1920" height="1080" src="http://dpm.drk-coe.de/slider/display" frameborder="0" allowfullscreen></iframe>
+</body>
+</html>
