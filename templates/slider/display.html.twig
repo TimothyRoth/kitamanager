@@ -35,10 +35,10 @@
                        placeholder="0000" autocomplete="off" required autofocus
                        data-pin-autosubmit>
 
-                <input type="hidden" name="_token" value="{{ csrf_token('display-pin') }}">
-
-                {# No visible CTA: the device's own confirm key (OK/Enter) submits
-                   the form; entering the 4th digit submits automatically. #}
+                {# No CSRF token: third-party iframe cookies are blocked in Edge/
+                   Chromium, so session CSRF would reject every PIN. The PIN is
+                   the shared secret. No visible CTA: OK/Enter or the 4th digit
+                   submits. #}
                 <button class="sr-only" type="submit">Slider starten</button>
 
                 <p style="color: #6b7280;">

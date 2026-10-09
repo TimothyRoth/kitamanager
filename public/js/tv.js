@@ -192,24 +192,47 @@
         }
     }
 
-    // The signage iframe cannot keep the PIN cookie on internal HTTP, so the
-    // page stores the four digits itself and sends them again after a reload.
+    // The signage iframe cannot keep the PIN cookie on internal HTTP / in a
+    // cross-site frame (Edge third-party cookies). Persist the PIN in
+    // localStorage when allowed, and mirror it in window.name so a reload of
+    // the same iframe frame still works when Tracking Prevention blocks storage.
     var PIN_STORAGE_KEY = 'kitamanager_display_pin';
 
     function readStoredPin() {
         try {
             var value = window.localStorage.getItem(PIN_STORAGE_KEY) || '';
-            return /^\d{4}$/.test(value) ? value : '';
+            if (/^\d{4}$/.test(value)) {
+                return value;
+            }
         } catch (e) {
-            return '';
+            // Edge Tracking Prevention may deny localStorage in third-party iframes.
         }
+
+        try {
+            var prefix = PIN_STORAGE_KEY + '=';
+            var name = String(window.name || '');
+            if (name.indexOf(prefix) === 0) {
+                var fromName = name.substring(prefix.length);
+                if (/^\d{4}$/.test(fromName)) {
+                    return fromName;
+                }
+            }
+        } catch (e2) {
+        }
+
+        return '';
     }
 
     function writeStoredPin(pin) {
         try {
             window.localStorage.setItem(PIN_STORAGE_KEY, pin);
         } catch (e) {
-            // Storage can be blocked; the cookie path still covers a direct browser.
+            // Storage can be blocked; window.name / cookie path are fallbacks.
+        }
+
+        try {
+            window.name = PIN_STORAGE_KEY + '=' + pin;
+        } catch (e2) {
         }
     }
 
@@ -217,6 +240,13 @@
         try {
             window.localStorage.removeItem(PIN_STORAGE_KEY);
         } catch (e) {
+        }
+
+        try {
+            if (String(window.name || '').indexOf(PIN_STORAGE_KEY + '=') === 0) {
+                window.name = '';
+            }
+        } catch (e2) {
         }
     }
 

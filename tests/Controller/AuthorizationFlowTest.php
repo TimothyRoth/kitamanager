@@ -442,6 +442,15 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    public function testCorrectPinLinksWithoutSessionCookie(): void
+    {
+        // Edge/Chromium block third-party cookies in a cross-site signage iframe.
+        // The PIN POST must succeed without any prior session.
+        $this->client->request('POST', '/slider/display', ['pin' => '1111']);
+
+        self::assertResponseRedirects('/slider/kita-a');
+    }
+
     public function testWrongPinIsRejected(): void
     {
         $crawler = $this->client->request('GET', '/slider/display');

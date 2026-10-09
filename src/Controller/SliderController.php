@@ -38,8 +38,12 @@ final class SliderController extends AbstractController
     public function display(Request $request, UserRepository $userRepository): Response
     {
         if ($request->isMethod('POST')) {
+            // No CSRF: this form is meant to run inside a cross-site signage
+            // iframe (Smart TV HTML gadget). Chromium/Edge block third-party
+            // cookies there, so a session-tied CSRF token can never validate
+            // even when the PIN is correct. The PIN itself is the shared secret.
             $pin = trim((string) $request->request->get('pin'));
-            $user = $this->isCsrfTokenValid('display-pin', $request->request->get('_token'))
+            $user = 1 === preg_match('/^\d{4}$/', $pin)
                 ? $userRepository->findOneBy(['devicePin' => $pin])
                 : null;
 

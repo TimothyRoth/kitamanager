@@ -48,7 +48,9 @@ In der Verwaltung hat jede Kita eine eigene vierstellige PIN. Am Fernseher wird 
 
 Mehrere Fernseher dürfen dieselbe PIN haben, dann zeigen sie denselben Slider. Wird die PIN in der Verwaltung geändert oder gelöscht, erscheint auf den betroffenen Geräten wieder die Eingabe.
 
-Die Zuordnung liegt im Speicher der eingebetteten Seite. Ein normales Cookie hält in diesem Rahmen ohne `https` nicht, deshalb wiederholt die Anzeige die PIN von sich aus.
+Die Zuordnung liegt im Speicher der eingebetteten Seite. Ein normales Cookie hält in diesem Rahmen ohne `https` nicht (und in Edge/Chromium oft auch nicht, wenn die Elternseite eine andere Domain hat), deshalb speichert die Anzeige die PIN selbst und sendet sie bei Bedarf erneut.
+
+Zum Testen am PC: Firefox und Edge verhalten sich hier unterschiedlich. Edge blockiert Third-Party-Cookies im iframe strenger; die PIN-Eingabe darf deshalb nicht von einer Session/CSRF abhängen. Am Fernseher zählt der eingebaute Browser der Signage-Software – dort denselben iframe-Code wie unten verwenden.
 
 ## Andere Geräte
 
