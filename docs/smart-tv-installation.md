@@ -17,7 +17,36 @@ https://www.ppds.com/de-de/downloads/products/digital-signage/signage-2000-serie
 | `https://…` auf die interne Domain | Scheitert ohne Zertifikat |
 | Feste Kita-URL `/slider/kita-…` für alle Geräte | Möglich, aber unnötig – dann bräuchte jedes Gerät einen anderen Inhalt |
 
-USB-Stick ist nur praktisch, um die HTML-Datei auf den **PC mit CMND** zu bringen (zum Kopieren in das Gadget). Der Stick ersetzt CMND nicht.
+### USB-Stick – was er kann und was nicht
+
+Den Stick in den Fernseher stecken und das HTML-Gadget „lokal hosten“ **geht nicht**. Die B-Line startet von USB keinen Smartinfo-Inhalt und keinen eingebetteten Webserver. USB am TV ist höchstens für Medien (Bilder/Video) oder Firmware gedacht.
+
+Sinnvoller Einsatz des Sticks:
+
+- Datei auf den **PC** kopieren (CMND & Create / späteres Einfügen ins Gadget)
+- Datei auf einem **PC im gleichen Netz** per Browser oder kleinem HTTP-Server bereitstellen (Zwischenlösung, siehe unten)
+- PC per **HDMI** am TV, Browser Vollbild mit der HTML-Datei oder der Display-URL
+
+Der Stick ersetzt weder CMND noch den Kitamanager-Server. Das iframe braucht immer Netz zu `http://dpm.drk-coe.de` (bzw. der internen Ersatzadresse).
+
+## Zwischenlösung ohne CMND / cmnd.io
+
+Solange der Zugang zu CMND bzw. cmnd.io fehlt, reicht zum Testen oder Übergangsbetrieb einer der Wege:
+
+1. **Direkt-URL** (wenn der TV einen Browser oder eine Start-URL hat):  
+   `http://dpm.drk-coe.de/slider/display`
+2. **HTML über eine LAN-IP** (entspricht dem Weg, der oft schon mit einer einfachen HTML-Seite + Link funktioniert hat): `docs/smart-tv-html-gadget.html` auf einen erreichbaren Host legen (PC im Netz, optional unter `/tv.html` auf dem App-Server) und am TV diese HTTP-Adresse öffnen – nicht als Smart Card.
+3. **PC an HDMI**: HTML-Datei oder Display-URL im Browser Vollbild.
+
+Beispiel Mini-Server auf dem PC (Stick-Inhalt nach `docs` bzw. Ordner mit der HTML-Datei):
+
+```text
+php -S 0.0.0.0:8080
+```
+
+Am TV dann z. B. `http://IP-DES-PCS:8080/smart-tv-html-gadget.html`.
+
+Dauerhaft nach dem Einschalten ohne Zusatzgerät bleibt der Hersteller-Weg über CMND (nächster Abschnitt).
 
 ## Richtiger Weg: Smartinfo + HTML-Gadget
 
