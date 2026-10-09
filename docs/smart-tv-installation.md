@@ -50,7 +50,7 @@ Mehrere Fernseher dürfen dieselbe PIN haben, dann zeigen sie denselben Slider. 
 
 Die Zuordnung liegt im Speicher der eingebetteten Seite. Ein normales Cookie hält in diesem Rahmen ohne `https` nicht (und in Edge/Chromium oft auch nicht, wenn die Elternseite eine andere Domain hat), deshalb speichert die Anzeige die PIN selbst und sendet sie bei Bedarf erneut.
 
-Zum Testen am PC: Firefox und Edge verhalten sich hier unterschiedlich. Edge blockiert Third-Party-Cookies im iframe strenger; die PIN-Eingabe darf deshalb nicht von einer Session/CSRF abhängen. Am Fernseher zählt der eingebaute Browser der Signage-Software – dort denselben iframe-Code wie unten verwenden.
+Zum Testen am PC: eine lokale HTML-Datei (`file:///…`) darf den iframe einbetten. Dafür darf die App **kein** `Content-Security-Policy: frame-ancestors *` senden – `*` gilt nur für `http`/`https`, nicht für `file:`. Edge blockiert zudem Third-Party-Cookies im iframe strenger; die PIN-Eingabe hängt deshalb nicht an einer Session/CSRF. Am Fernseher denselben iframe-Code wie unten verwenden.
 
 ## Andere Geräte
 

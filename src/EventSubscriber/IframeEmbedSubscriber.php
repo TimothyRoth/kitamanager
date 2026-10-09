@@ -8,9 +8,13 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Intranet: the site may be shown in any iframe. Reachability of the
- * internal DNS name (typically via VPN) is the access control; browser
- * clickjacking headers must not add a second origin check on top.
+ * Intranet / Smart-TV: allow embedding from any parent, including local
+ * HTML gadgets opened as file:// (Philips CMND, desktop test files, …).
+ *
+ * Important: do NOT send "Content-Security-Policy: frame-ancestors *".
+ * In CSP3, "*" only matches http/https/ws/wss parents — not file: — so that
+ * header blocks the exact TV/test setup we need. Omitting both CSP
+ * frame-ancestors and X-Frame-Options is what actually permits all parents.
  */
 final class IframeEmbedSubscriber implements EventSubscriberInterface
 {
@@ -25,7 +29,7 @@ final class IframeEmbedSubscriber implements EventSubscriberInterface
 
     public static function getSubscribedEvents(): array
     {
-        // Run late so a proxy-copied SAMEORIGIN header set earlier is cleared.
+        // Run late so a proxy-copied SAMEORIGIN / frame-ancestors header is cleared.
         return [
             KernelEvents::RESPONSE => ['onKernelResponse', -1024],
         ];
@@ -35,8 +39,38 @@ final class IframeEmbedSubscriber implements EventSubscriberInterface
     {
         $headers = $response->headers;
         $headers->remove('X-Frame-Options');
-        $headers->set('Content-Security-Policy', 'frame-ancestors *');
+        $this->stripFrameAncestorsCsp($response);
         $headers->set('Cross-Origin-Resource-Policy', 'cross-origin');
         $headers->set('Access-Control-Allow-Origin', '*');
+    }
+
+    /**
+     * Drop frame-ancestors from CSP (or the whole header if that was the only
+     * directive). Leaving "frame-ancestors *" in place would block file: parents.
+     */
+    private function stripFrameAncestorsCsp(Response $response): void
+    {
+        $headers = $response->headers;
+        $csp = $headers->all('Content-Security-Policy');
+        if ([] === $csp) {
+            return;
+        }
+
+        $kept = [];
+        foreach ($csp as $policy) {
+            $directives = array_filter(array_map('trim', explode(';', (string) $policy)));
+            $directives = array_values(array_filter(
+                $directives,
+                static fn (string $directive): bool => !str_starts_with(strtolower($directive), 'frame-ancestors')
+            ));
+            if ([] !== $directives) {
+                $kept[] = implode('; ', $directives);
+            }
+        }
+
+        $headers->remove('Content-Security-Policy');
+        foreach ($kept as $policy) {
+            $headers->set('Content-Security-Policy', $policy, false);
+        }
     }
 }
