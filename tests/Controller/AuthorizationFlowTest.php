@@ -477,6 +477,27 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertTrue($body['unlinked'] ?? false, 'Expected unlinked after PIN change; got: ' . json_encode($body));
     }
 
+    public function testDisplayPinHeaderKeepsSliderWithoutCookie(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content', [], [], [
+            'HTTP_X_DISPLAY_PIN' => '1111',
+        ]);
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+
+        self::assertArrayHasKey('html', $body);
+        self::assertArrayNotHasKey('unlinked', $body);
+    }
+
+    public function testStaleDisplayPinHeaderUnlinksWithoutCookie(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content', [], [], [
+            'HTTP_X_DISPLAY_PIN' => '9999',
+        ]);
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+
+        self::assertTrue($body['unlinked'] ?? false);
+    }
+
     public function testNewContentAppearsOnTvWithoutReload(): void
     {
         $crawler = $this->client->request('GET', '/slider/display');

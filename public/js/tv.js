@@ -132,6 +132,10 @@
                 var separator = url.indexOf('?') === -1 ? '?' : '&';
                 xhr.open('GET', url + separator + '_=' + new Date().getTime(), true);
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                var storedPin = readStoredPin();
+                if (storedPin) {
+                    xhr.setRequestHeader('X-Display-Pin', storedPin);
+                }
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState !== 4 || xhr.status !== 200) {
                         return;
@@ -147,6 +151,7 @@
                     // The device's PIN no longer belongs to this slider
                     // (admin changed or removed it): go back to the PIN page.
                     if (data.unlinked) {
+                        clearStoredPin();
                         window.location.href = viewport.getAttribute('data-display-url') || '/slider/display';
                         return;
                     }
@@ -187,10 +192,44 @@
         }
     }
 
+    // The signage iframe cannot keep the PIN cookie on internal HTTP, so the
+    // page stores the four digits itself and sends them again after a reload.
+    var PIN_STORAGE_KEY = 'kitamanager_display_pin';
+
+    function readStoredPin() {
+        try {
+            var value = window.localStorage.getItem(PIN_STORAGE_KEY) || '';
+            return /^\d{4}$/.test(value) ? value : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function writeStoredPin(pin) {
+        try {
+            window.localStorage.setItem(PIN_STORAGE_KEY, pin);
+        } catch (e) {
+            // Storage can be blocked; the cookie path still covers a direct browser.
+        }
+    }
+
+    function clearStoredPin() {
+        try {
+            window.localStorage.removeItem(PIN_STORAGE_KEY);
+        } catch (e) {
+        }
+    }
+
     // PIN entry page: submit as soon as the 4th digit is entered, so no
-    // separate confirm button is needed on the device.
+    // separate confirm button is needed on the device. A stored PIN is sent
+    // again on the next visit, unless the previous attempt was rejected.
     function initPinAutoSubmit() {
         var inputs = document.querySelectorAll('input[data-pin-autosubmit]');
+        var rejected = document.querySelector('.alert-danger');
+        if (rejected) {
+            clearStoredPin();
+        }
+
         for (var i = 0; i < inputs.length; i++) {
             (function (input) {
                 var submitted = false;
@@ -205,6 +244,7 @@
                     }
                     if (input.form) {
                         submitted = true;
+                        writeStoredPin(value);
                         input.form.submit();
                     }
                 }
@@ -212,6 +252,14 @@
                 // 'keyup' as fallback for engines with unreliable 'input' events.
                 input.addEventListener('input', maybeSubmit);
                 input.addEventListener('keyup', maybeSubmit);
+
+                if (!rejected) {
+                    var stored = readStoredPin();
+                    if (stored) {
+                        input.value = stored;
+                        maybeSubmit();
+                    }
+                }
             })(inputs[i]);
         }
     }
