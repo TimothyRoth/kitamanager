@@ -2,6 +2,7 @@
 
 namespace App\Tests\Security;
 
+use App\Entity\Content;
 use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Security\SliderItemVoter;
@@ -31,7 +32,7 @@ final class SliderItemVoterTest extends TestCase
         self::assertSame(VoterInterface::ACCESS_DENIED, $voter->vote($token, $item, [SliderItemVoter::MANAGE]));
     }
 
-    public function testGrantsOwningConsumer(): void
+    public function testGrantsOwningConsumerManage(): void
     {
         $consumer = $this->user(3);
         $voter = $this->voter(false);
@@ -42,7 +43,7 @@ final class SliderItemVoterTest extends TestCase
         );
     }
 
-    public function testDeniesOtherConsumer(): void
+    public function testDeniesOtherConsumerManage(): void
     {
         $voter = $this->voter(false);
 
@@ -52,7 +53,7 @@ final class SliderItemVoterTest extends TestCase
         );
     }
 
-    public function testGrantsAdminForAnyItem(): void
+    public function testGrantsAdminForAnyItemManage(): void
     {
         $voter = $this->voter(true);
         $admin = $this->user(99, ['ROLE_ADMIN', 'ROLE_USER']);
@@ -60,6 +61,52 @@ final class SliderItemVoterTest extends TestCase
         self::assertSame(
             VoterInterface::ACCESS_GRANTED,
             $voter->vote($this->token($admin), $this->itemOwnedBy($this->user(1)), [SliderItemVoter::MANAGE])
+        );
+    }
+
+    public function testGrantsToggleForOwnContent(): void
+    {
+        $consumer = $this->user(3);
+        $voter = $this->voter(false);
+
+        self::assertSame(
+            VoterInterface::ACCESS_GRANTED,
+            $voter->vote(
+                $this->token($consumer),
+                $this->itemOwnedBy($consumer, $consumer),
+                [SliderItemVoter::TOGGLE]
+            )
+        );
+    }
+
+    public function testDeniesToggleForAssignedForeignContent(): void
+    {
+        $consumer = $this->user(3);
+        $creator = $this->user(7);
+        $voter = $this->voter(false);
+
+        self::assertSame(
+            VoterInterface::ACCESS_DENIED,
+            $voter->vote(
+                $this->token($consumer),
+                $this->itemOwnedBy($consumer, $creator),
+                [SliderItemVoter::TOGGLE]
+            )
+        );
+    }
+
+    public function testGrantsAdminToggleForForeignContent(): void
+    {
+        $voter = $this->voter(true);
+        $admin = $this->user(99, ['ROLE_ADMIN', 'ROLE_USER']);
+
+        self::assertSame(
+            VoterInterface::ACCESS_GRANTED,
+            $voter->vote(
+                $this->token($admin),
+                $this->itemOwnedBy($this->user(1), $this->user(2)),
+                [SliderItemVoter::TOGGLE]
+            )
         );
     }
 
@@ -82,10 +129,16 @@ final class SliderItemVoterTest extends TestCase
         return $user;
     }
 
-    private function itemOwnedBy(User $consumer): SliderItem
+    private function itemOwnedBy(User $consumer, ?User $creator = null): SliderItem
     {
         $item = $this->createStub(SliderItem::class);
         $item->method('getConsumer')->willReturn($consumer);
+
+        if (null !== $creator) {
+            $content = $this->createStub(Content::class);
+            $content->method('getCreator')->willReturn($creator);
+            $item->method('getContent')->willReturn($content);
+        }
 
         return $item;
     }

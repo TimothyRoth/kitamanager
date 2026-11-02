@@ -21,6 +21,9 @@ class SliderItemRepository extends ServiceEntityRepository
     /**
      * Active slides for a consumer's slider, in display order.
      *
+     * Own content respects isEnabled; content assigned by someone else is
+     * always shown (consumers can no longer deactivate foreign slides).
+     *
      * @return SliderItem[]
      */
     public function findEnabledForConsumer(User $consumer): array
@@ -28,9 +31,8 @@ class SliderItemRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('si')
             ->innerJoin('si.content', 'c')->addSelect('c')
             ->andWhere('si.consumer = :consumer')
-            ->andWhere('si.isEnabled = :enabled')
+            ->andWhere('si.isEnabled = true OR c.creator != :consumer')
             ->setParameter('consumer', $consumer)
-            ->setParameter('enabled', true)
             ->orderBy('si.displayOrder', 'ASC')
             ->getQuery()
             ->getResult();

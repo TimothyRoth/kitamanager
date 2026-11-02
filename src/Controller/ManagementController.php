@@ -578,7 +578,8 @@ final class ManagementController extends AbstractController
     #[Route('/slider-item/{id}/toggle-status', name: 'app_management_slider_toggle_status', methods: ['POST'])]
     public function toggleSliderItemStatus(Request $request, SliderItem $item, EntityManagerInterface $entityManager): Response
     {
-        $this->denyAccessUnlessGranted('MANAGE', $item);
+        // Only the creator may activate/deactivate; assigned foreign content stays fixed.
+        $this->denyAccessUnlessGranted('TOGGLE', $item);
 
         if ($this->isCsrfTokenValid('toggle-status' . $item->getId(), $request->request->get('_token'))) {
             $item->setIsEnabled(!$item->isEnabled());

@@ -43,6 +43,20 @@
                 der Fernseher merkt sich die Verbindung und zeigt dann automatisch den
                 Slider dieses Benutzers an. Mehrere Fernseher können dieselbe PIN verwenden.
             </p>
+
+            {% if user.devicePin %}
+                <div class="alert alert-success pin-reachability" role="status">
+                    Der Slider von <strong>{{ user.username }}</strong> ist derzeit über die
+                    PIN <strong class="pin-reachability-code">{{ user.devicePin }}</strong> erreichbar
+                    (<a href="{{ path('app_slider', {'slug': user.slug}) }}">Vorschau öffnen</a>).
+                </div>
+            {% else %}
+                <div class="alert alert-warning pin-reachability" role="status">
+                    Derzeit ist keine PIN hinterlegt – der Slider von
+                    <strong>{{ user.username }}</strong> ist nicht über die Fernseher-Zuordnung erreichbar.
+                </div>
+            {% endif %}
+
             {{ form_start(devicePinForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
             <div class="form-group">
                 {{ form_row(devicePinForm.devicePin) }}

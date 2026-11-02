@@ -41,6 +41,7 @@
         <div class="data-list">
             <div class="data-row data-header">
                 <div class="data-cell">Name</div>
+                <div class="data-cell">Fernseher-PIN</div>
                 <div class="data-cell cell-actions">Aktionen</div>
             </div>
 
@@ -49,6 +50,14 @@
                     <div class="data-cell">
                         <span class="data-cell-label">Name</span>
                         <a href="{{ path('app_slider', {'slug': user.slug}) }}">{{ user.username }}</a>
+                    </div>
+                    <div class="data-cell">
+                        <span class="data-cell-label">Fernseher-PIN</span>
+                        {% if user.devicePin %}
+                            <span class="pin-reachability-code" title="Slider über diese PIN erreichbar">{{ user.devicePin }}</span>
+                        {% else %}
+                            <span class="text-muted">nicht erreichbar</span>
+                        {% endif %}
                     </div>
                     <div class="data-cell cell-actions">
                         <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-link">Bearbeiten</a>

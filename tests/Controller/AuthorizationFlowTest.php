@@ -391,6 +391,26 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertTrue($itemB->isEnabled());
     }
 
+    public function testAssignedForeignContentCannotBeToggled(): void
+    {
+        $content = $this->createArticle($this->kitaA, 'Von A', [$this->kitaB->getId()], false);
+        $itemB = $this->sliderItemFor($content, $this->kitaB);
+        self::assertNotNull($itemB);
+
+        $this->client->loginUser($this->kitaB);
+        $crawler = $this->client->request('GET', '/management/user');
+        self::assertCount(
+            0,
+            $crawler->filter(sprintf('form[action$="/management/slider-item/%d/toggle-status"]', $itemB->getId()))
+        );
+        self::assertSelectorTextContains('#slider-item-' . $itemB->getId(), 'Zugewiesen');
+
+        $this->client->request('POST', '/management/slider-item/' . $itemB->getId() . '/toggle-status', [
+            '_token' => 'whatever',
+        ]);
+        self::assertResponseStatusCodeSame(403);
+    }
+
     public function testKitaCanSetSlideDuration(): void
     {
         $this->client->loginUser($this->kitaA);
@@ -440,6 +460,22 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseRedirects('/slider/kita-a');
         $this->client->followRedirect();
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.tv-pin-watermark');
+        self::assertSelectorTextContains('.tv-pin-watermark', '1111');
+    }
+
+    public function testAdminSeesPinReachabilityOnEditUser(): void
+    {
+        $this->client->loginUser($this->admin);
+        $this->client->request('GET', '/management/admin/edit-user/' . $this->kitaA->getId());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.pin-reachability');
+        self::assertSelectorTextContains('.pin-reachability', '1111');
+
+        $this->client->request('GET', '/management/admin');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', '1111');
+        self::assertSelectorTextContains('body', 'nicht erreichbar'); // kita-c has no PIN
     }
 
     public function testCorrectPinLinksWithoutSessionCookie(): void
