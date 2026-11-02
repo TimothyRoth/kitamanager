@@ -100,7 +100,8 @@
 
                 {% for item in sliderItems %}
                     {% set content = item.content %}
-                    <div class="data-row {{ not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
+                    {% set isOwnContent = content.creator and content.creator.id == app.user.id %}
+                    <div class="data-row {{ isOwnContent and not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
                         {% if sliderItems|length > 1 %}
                             <div class="data-cell cell-order">
                                 <span class="data-cell-label">Reihenfolge</span>
@@ -154,20 +155,30 @@
                         </div>
                         <div class="data-cell">
                             <span class="data-cell-label">Status</span>
-                            <form class="form-inline" method="post"
-                                  action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
-                                  data-turbo="false" data-preserve-scroll>
-                                <input type="hidden" name="_token"
-                                       value="{{ csrf_token('toggle-status' ~ item.id) }}">
-                                <button type="submit"
-                                        class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
-                                        title="Tippen, um den Status zu ändern"
-                                        aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
+                            {% if isOwnContent %}
+                                <form class="form-inline" method="post"
+                                      action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
+                                      data-turbo="false" data-preserve-scroll>
+                                    <input type="hidden" name="_token"
+                                           value="{{ csrf_token('toggle-status' ~ item.id) }}">
+                                    <button type="submit"
+                                            class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
+                                            title="Tippen, um den Status zu ändern"
+                                            aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
+                                        <span class="status-toggle-dot" aria-hidden="true"></span>
+                                        {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
+                                    </button>
+                                    <span class="status-toggle-hint">Zum Umschalten tippen</span>
+                                </form>
+                            {% else %}
+                                <span class="status-toggle status-toggle-active status-toggle-readonly"
+                                      title="Zugewiesene Inhalte können nicht deaktiviert werden"
+                                      aria-label="Aktiv – zugewiesener Inhalt">
                                     <span class="status-toggle-dot" aria-hidden="true"></span>
-                                    {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
-                                </button>
-                                <span class="status-toggle-hint">Zum Umschalten tippen</span>
-                            </form>
+                                    Aktiv
+                                </span>
+                                <span class="status-toggle-hint">Zugewiesen – nicht änderbar</span>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}

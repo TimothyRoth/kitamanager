@@ -95,7 +95,7 @@ sequenceDiagram
 
     App->>Konsument: Inhalt erscheint im Slider ("Mein Slider")
     Konsument->>App: Reihenfolge ändern / Slide deaktivieren
-    Note over Konsument,App: SliderItemVoter: nur die Empfänger-Kita<br/>selbst oder Admin darf MANAGE.<br/>Deaktivieren wirkt nur auf den eigenen Slider.
+    Note over Konsument,App: SliderItemVoter MANAGE: Empfänger darf sortieren.<br/>TOGGLE nur für eigene Inhalte.<br/>Zugewiesene Fremdinhalte bleiben immer aktiv.
 
     TV->>App: /slider/display aufrufen, PIN eingeben
     App-->>TV: Cookie setzen, Weiterleitung auf /slider/{slug}
@@ -169,7 +169,8 @@ classDiagram
 
 ### Slider
 - [ ] Kita kann Reihenfolge der eigenen Slides ändern (hoch/runter).
-- [ ] Kita kann einen Slide deaktivieren – er verschwindet nur aus ihrem eigenen Slider, nicht bei anderen Empfängern.
+- [ ] Kita kann eigene Inhalte im Slider aktivieren/deaktivieren – wirkt nur auf ihren Slider.
+- [ ] Von anderen zugewiesene Inhalte sind im Empfänger-Slider nicht aktivier-/deaktivierbar.
 - [ ] Kita kann die Anzeigedauer pro Slide einstellen.
 - [ ] Kita kann Slides anderer Kitas nicht verwalten (direkte URL-Aufrufe werden abgelehnt).
 
@@ -177,4 +178,6 @@ classDiagram
 - [ ] `/slider/display`: korrekte PIN führt zum Slider der richtigen Kita.
 - [ ] Falsche PIN wird abgelehnt.
 - [ ] Ändert/entfernt der Admin die PIN, zeigt das gekoppelte TV wieder die PIN-Eingabe ("unlinked").
+- [ ] Slider zeigt ein erkennbares PIN-Wasserzeichen, wenn eine Geräte-PIN gesetzt ist.
+- [ ] Admin sieht in der Benutzerliste und beim Bearbeiten, ob/mit welcher PIN der Slider erreichbar ist.
 - [ ] Neue/aktivierte Inhalte erscheinen ohne Neuladen auf dem TV (regelmäßige Abfrage).

@@ -355,11 +355,30 @@ button.btn-link.text-danger:hover {
     font-weight: 400;
 }
 
+.status-toggle-readonly {
+    cursor: default;
+    pointer-events: none;
+}
+
+.status-toggle-readonly:hover {
+    box-shadow: none;
+}
+
 /* Hide tap hint only on fine-pointer desktops; keep it for iPad/touch */
 @media (hover: hover) and (pointer: fine) and (min-width: 1280px) {
     .status-toggle-hint {
         display: none;
     }
+}
+
+.pin-reachability-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+}
+
+.pin-reachability {
+    margin-top: var(--spacing-md);
 }
 
 /* Flashes / Alerts */

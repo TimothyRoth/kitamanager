@@ -13,8 +13,9 @@ use Doctrine\ORM\EntityManagerInterface;
  * Single source of truth for keeping the SliderItem delivery rows consistent.
  *
  * A SliderItem (content, consumer) means "this content is delivered to this
- * consumer's slider". Reordering and enabling/disabling happen per consumer on
- * the SliderItem; the creator only controls a content's existence and audience.
+ * consumer's slider". Reordering happens per consumer; enabling/disabling is
+ * only allowed for content the consumer created. The creator controls a
+ * content's existence and audience.
  */
 class AudienceSynchronizer
 {
