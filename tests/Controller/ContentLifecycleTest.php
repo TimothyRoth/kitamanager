@@ -266,31 +266,6 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertFileDoesNotExist($oldImage);
     }
 
-    public function testSlidesWithTheSameOrderNumberCanStillBeReordered(): void
-    {
-        $first = $this->sliderItemOf($this->seedArticle($this->kitaA, 'Slide 1'));
-        $second = $this->sliderItemOf($this->seedArticle($this->kitaA, 'Slide 2'));
-        $first->setDisplayOrder(5);
-        $second->setDisplayOrder(5);
-        $this->em->flush();
-
-        $this->client->loginUser($this->kitaA);
-        $crawler = $this->client->request('GET', '/management/user');
-        $this->client->submit(
-            $crawler->filter(sprintf('form[action$="/management/slider-item/%d/move-down"]', $first->getId()))->form()
-        );
-
-        $this->em->clear();
-        $first = $this->em->getRepository(SliderItem::class)->find($first->getId());
-        $second = $this->em->getRepository(SliderItem::class)->find($second->getId());
-        self::assertGreaterThan($second->getDisplayOrder(), $first->getDisplayOrder());
-    }
-
-    private function sliderItemOf(Content $content): SliderItem
-    {
-        return $this->em->getRepository(SliderItem::class)->findOneBy(['content' => $content]);
-    }
-
     public function testDeleteContentRemovesRowAndSliderItems(): void
     {
         $content = $this->seedArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);
@@ -403,25 +378,5 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('.alert-danger');
         self::assertSelectorTextContains('body', 'PIN');
-    }
-
-    public function testMoveDownReordersSlides(): void
-    {
-        $c1 = $this->seedArticle($this->kitaA, 'Slide 1');
-        $c2 = $this->seedArticle($this->kitaA, 'Slide 2');
-        $item1 = $this->em->getRepository(SliderItem::class)->findOneBy(['content' => $c1, 'consumer' => $this->kitaA]);
-        $item2 = $this->em->getRepository(SliderItem::class)->findOneBy(['content' => $c2, 'consumer' => $this->kitaA]);
-        self::assertLessThan($item2->getDisplayOrder(), $item1->getDisplayOrder());
-
-        $this->client->loginUser($this->kitaA);
-        $crawler = $this->client->request('GET', '/management/user');
-        $form = $crawler->filter(sprintf('form[action$="/management/slider-item/%d/move-down"]', $item1->getId()))->form();
-        $this->client->submit($form);
-        self::assertResponseRedirects('/management/user');
-
-        $this->em->clear();
-        $item1 = $this->em->getRepository(SliderItem::class)->find($item1->getId());
-        $item2 = $this->em->getRepository(SliderItem::class)->find($item2->getId());
-        self::assertGreaterThan($item2->getDisplayOrder(), $item1->getDisplayOrder());
     }
 }

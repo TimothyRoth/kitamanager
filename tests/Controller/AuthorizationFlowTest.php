@@ -209,6 +209,41 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertStringContainsString('/admin', $this->client->getResponse()->headers->get('Location') ?? '');
     }
 
+    public function testStayLoggedInSurvivesTheEndOfTheSession(): void
+    {
+        $crawler = $this->client->request('GET', '/admin');
+        $form = $crawler->selectButton('Anmelden')->form(['_username' => 'kita-a', '_password' => 'kita-a-secret']);
+        $form['_remember_me']->tick();
+        $this->client->submit($form);
+        self::assertNotNull($this->client->getCookieJar()->get('REMEMBERME'));
+
+        $this->client->getCookieJar()->expire('MOCKSESSID');
+        $this->client->request('GET', '/management/user');
+
+        self::assertResponseIsSuccessful();
+    }
+
+    public function testWithoutStayLoggedInTheLoginEndsWithTheSession(): void
+    {
+        $this->loginForm('kita-a', 'kita-a-secret');
+        self::assertNull($this->client->getCookieJar()->get('REMEMBERME'));
+
+        $this->client->getCookieJar()->expire('MOCKSESSID');
+        $this->client->request('GET', '/management/user');
+
+        self::assertResponseRedirects();
+    }
+
+    public function testPasswordFieldsOfferAShowPasswordButton(): void
+    {
+        $crawler = $this->client->request('GET', '/admin');
+        self::assertCount(1, $crawler->filter('.password-field input[type="password"] + [data-password-toggle]'));
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        self::assertCount(3, $crawler->filter('.password-field input[type="password"] + [data-password-toggle]'));
+    }
+
     // --- Benutzerverwaltung (Admin) ----------------------------------------
 
     public function testAdminCanCreateKita(): void
@@ -447,22 +482,83 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testKitaCanReorderOwnSlides(): void
     {
-        $c1 = $this->createArticle($this->kitaA, 'Slide 1', [], false);
-        $c2 = $this->createArticle($this->kitaA, 'Slide 2', [], false);
-        $item1 = $this->sliderItemFor($c1, $this->kitaA);
-        $item2 = $this->sliderItemFor($c2, $this->kitaA);
-        self::assertLessThan($item2->getDisplayOrder(), $item1->getDisplayOrder());
+        $first = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 1'), $this->kitaA);
+        $second = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 2'), $this->kitaA);
+        $third = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 3'), $this->kitaA);
 
         $this->client->loginUser($this->kitaA);
-        $crawler = $this->client->request('GET', '/management/user');
-        $form = $crawler->filter(sprintf('form[action$="/management/slider-item/%d/move-up"]', $item2->getId()))->form();
-        $this->client->submit($form);
-        self::assertResponseRedirects('/management/user');
+        $this->arrangeSlider([$third->getId(), $first->getId(), $second->getId()]);
 
+        self::assertResponseStatusCodeSame(204);
+        self::assertSame([$third->getId(), $first->getId(), $second->getId()], $this->sliderOrderOf($this->kitaA));
+    }
+
+    public function testArrangingTheSliderGivesEverySlideItsOwnOrderNumber(): void
+    {
+        $first = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 1'), $this->kitaA);
+        $second = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 2'), $this->kitaA);
+        $unmentioned = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 3'), $this->kitaA);
+        foreach ([$first, $second, $unmentioned] as $item) {
+            $item->setDisplayOrder(5);
+        }
+        $this->em->flush();
+
+        $this->client->loginUser($this->kitaA);
+        $this->arrangeSlider([$second->getId(), $first->getId()]);
+
+        self::assertSame([$second->getId(), $first->getId(), $unmentioned->getId()], $this->sliderOrderOf($this->kitaA));
         $this->em->clear();
-        $item1 = $this->em->getRepository(SliderItem::class)->find($item1->getId());
-        $item2 = $this->em->getRepository(SliderItem::class)->find($item2->getId());
-        self::assertLessThan($item1->getDisplayOrder(), $item2->getDisplayOrder());
+        $orderNumbers = array_map(
+            static fn (SliderItem $item) => $item->getDisplayOrder(),
+            $this->em->getRepository(SliderItem::class)->findAllForConsumer($this->em->find(User::class, $this->kitaA->getId()))
+        );
+        self::assertSame([1, 2, 3], $orderNumbers);
+    }
+
+    public function testArrangingIgnoresSlidesOfOtherKitas(): void
+    {
+        $foreignFirst = $this->sliderItemFor($this->createArticle($this->kitaB, 'Fremd 1'), $this->kitaB);
+        $foreignSecond = $this->sliderItemFor($this->createArticle($this->kitaB, 'Fremd 2'), $this->kitaB);
+        $this->createArticle($this->kitaA, 'Eigener Slide');
+
+        $this->client->loginUser($this->kitaA);
+        $this->arrangeSlider([$foreignSecond->getId(), $foreignFirst->getId()]);
+
+        self::assertSame([$foreignFirst->getId(), $foreignSecond->getId()], $this->sliderOrderOf($this->kitaB));
+    }
+
+    public function testArrangingTheSliderNeedsAValidToken(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->client->request('GET', '/management/user');
+        $this->client->request('POST', '/management/slider-item/reorder', ['_token' => 'invalid', 'ids' => []]);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * @param int[] $itemIdsInNewOrder
+     */
+    private function arrangeSlider(array $itemIdsInNewOrder): void
+    {
+        $crawler = $this->client->request('GET', '/management/user');
+        $this->client->request('POST', '/management/slider-item/reorder', [
+            '_token' => $crawler->filter('[data-reorder-token]')->attr('data-reorder-token'),
+            'ids' => $itemIdsInNewOrder,
+        ]);
+    }
+
+    /**
+     * @return int[]
+     */
+    private function sliderOrderOf(User $consumer): array
+    {
+        $this->em->clear();
+
+        return array_map(
+            static fn (SliderItem $item) => $item->getId(),
+            $this->em->getRepository(SliderItem::class)->findAllForConsumer($this->em->find(User::class, $consumer->getId()))
+        );
     }
 
     public function testDisablingSlideOnlyAffectsOwnSlider(): void

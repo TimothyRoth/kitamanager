@@ -1,0 +1,19 @@
+{% import '_icons.html.twig' as icons %}
+<header class="app-bar">
+    <a class="app-bar-brand" href="{{ path(is_granted('ROLE_ADMIN') ? 'app_management_admin' : 'app_management_user') }}">
+        <span class="app-bar-logo">{{ icons.icon('tv') }}</span>
+        Kita-Manager
+    </a>
+    <div class="app-bar-actions">
+        <span class="app-bar-user">{{ app.user.username }}</span>
+        {% if settings_anchor|default(false) %}
+            <a href="#einstellungen" class="btn btn-ghost btn-square" aria-label="Einstellungen" title="Einstellungen">{{ icons.icon('settings') }}</a>
+        {% endif %}
+        <button type="button" class="btn btn-ghost btn-square" data-theme-toggle
+                aria-label="Zwischen hellem und dunklem Design wechseln" title="Hell / Dunkel">
+            <span class="theme-toggle-to-dark">{{ icons.icon('moon') }}</span>
+            <span class="theme-toggle-to-light">{{ icons.icon('sun') }}</span>
+        </button>
+        <a href="{{ logout_path() }}" class="btn btn-secondary">{{ icons.icon('logout') }}<span class="btn-text-optional">Abmelden</span></a>
+    </div>
+</header>

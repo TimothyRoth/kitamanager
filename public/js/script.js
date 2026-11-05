@@ -7,6 +7,132 @@ document.addEventListener('DOMContentLoaded', () => {
     // (matches the server-side "25M" constraint, 10^6 bytes per "M").
     const MAX_ORIGINAL_BYTES = 25 * 1000 * 1000;
 
+    const initThemeToggle = () => {
+        const toggle = document.querySelector('[data-theme-toggle]');
+        if (!toggle) return;
+
+        toggle.addEventListener('click', () => {
+            const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = theme;
+            try {
+                localStorage.setItem('km-theme', theme);
+            } catch {
+                // Private mode: the choice then lasts for this page only.
+            }
+        });
+    };
+
+    // Reorder "Mein Slider": drag a row by its handle (mouse, touch, pen) or
+    // move it with the arrow keys while the handle has focus.
+    const initSortableList = () => {
+        const list = document.querySelector('[data-sortable-list]');
+        if (!list) return;
+
+        const EDGE_SCROLL_ZONE = 72;
+        const EDGE_SCROLL_STEP = 14;
+
+        const rows = () => Array.from(list.children);
+        const currentOrder = () => rows().map(row => row.dataset.itemId);
+        const middleOf = (row) => {
+            const box = row.getBoundingClientRect();
+            return box.top + box.height / 2;
+        };
+
+        const renumber = () => {
+            rows().forEach((row, index) => {
+                row.querySelector('[data-slide-position]').textContent = index + 1;
+            });
+        };
+
+        const saveOrder = async () => {
+            const body = new FormData();
+            body.append('_token', list.dataset.reorderToken);
+            currentOrder().forEach(id => body.append('ids[]', id));
+
+            try {
+                const response = await fetch(list.dataset.reorderUrl, {method: 'POST', body});
+                if (!response.ok) throw new Error(String(response.status));
+            } catch {
+                alert('Die Reihenfolge konnte nicht gespeichert werden. Die Seite wird neu geladen.');
+                window.location.reload();
+            }
+        };
+
+        // The dragged row itself never leaves the DOM (its neighbours are moved
+        // around it), otherwise the browser would end the drag.
+        const moveTowards = (row, pointerY) => {
+            const previous = row.previousElementSibling;
+            const next = row.nextElementSibling;
+
+            if (previous && pointerY < middleOf(previous)) {
+                list.insertBefore(previous, row.nextElementSibling);
+            } else if (next && pointerY > middleOf(next)) {
+                list.insertBefore(next, row);
+            }
+        };
+
+        list.addEventListener('pointerdown', (event) => {
+            const handle = event.target.closest('[data-drag-handle]');
+            if (!handle || event.button !== 0) return;
+
+            const row = handle.closest('[data-item-id]');
+            const orderBefore = currentOrder().join();
+            let pointerY = event.clientY;
+            let frame = null;
+
+            const step = () => {
+                if (pointerY < EDGE_SCROLL_ZONE) {
+                    window.scrollBy(0, -EDGE_SCROLL_STEP);
+                } else if (pointerY > window.innerHeight - EDGE_SCROLL_ZONE) {
+                    window.scrollBy(0, EDGE_SCROLL_STEP);
+                }
+                moveTowards(row, pointerY);
+                frame = requestAnimationFrame(step);
+            };
+
+            const onMove = (moveEvent) => {
+                pointerY = moveEvent.clientY;
+            };
+
+            const onEnd = () => {
+                cancelAnimationFrame(frame);
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onEnd);
+                document.removeEventListener('pointercancel', onEnd);
+                row.classList.remove('is-dragging');
+                list.classList.remove('is-sorting');
+                renumber();
+
+                if (currentOrder().join() !== orderBefore) {
+                    saveOrder();
+                }
+            };
+
+            event.preventDefault();
+            row.classList.add('is-dragging');
+            list.classList.add('is-sorting');
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onEnd);
+            document.addEventListener('pointercancel', onEnd);
+            frame = requestAnimationFrame(step);
+        });
+
+        list.addEventListener('keydown', (event) => {
+            const handle = event.target.closest('[data-drag-handle]');
+            if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+
+            const row = handle.closest('[data-item-id]');
+            const neighbour = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+            if (!neighbour) return;
+
+            event.preventDefault();
+            list.insertBefore(row, event.key === 'ArrowUp' ? neighbour : neighbour.nextElementSibling);
+            handle.focus();
+            renumber();
+            saveOrder();
+        });
+    };
+
     const initConfirmForms = () => {
         document.querySelectorAll('form[data-confirm]').forEach(form => {
             form.addEventListener('submit', (e) => {
@@ -125,21 +251,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const target = form.querySelector(list);
                 if (!target) return;
 
+                // Hide the whole field (label, help text, list), not just the list.
+                const field = target.closest('.form-row') || target;
                 const apply = () => {
-                    const display = input.checked ? 'none' : '';
-                    // Prefer the modern picker shell; fall back to list + legacy filter sibling.
-                    const picker = target.classList?.contains('choice-list')
-                        ? target.closest('.choice-picker')
-                        : null;
-                    if (picker) {
-                        picker.style.display = display;
-                        return;
-                    }
-                    target.style.display = display;
-                    const sibling = target.previousElementSibling;
-                    if (sibling && sibling.classList.contains('choice-filter')) {
-                        sibling.style.display = display;
-                    }
+                    field.style.display = input.checked ? 'none' : '';
                 };
 
                 input.addEventListener('change', apply);
@@ -162,7 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const avatar = document.createElement('span');
                 avatar.className = 'choice-avatar';
                 avatar.setAttribute('aria-hidden', 'true');
-                avatar.textContent = name.charAt(0).toUpperCase();
+                const [firstWord, rest] = name.split(/ (.*)/);
+                avatar.textContent = (rest || firstWord).charAt(0).toUpperCase();
                 item.insertBefore(avatar, label);
             });
 
@@ -772,6 +888,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Run initializations
+    initThemeToggle();
+    initSortableList();
     initConfirmForms();
     initWysiwyg();
     initBulkDelete();

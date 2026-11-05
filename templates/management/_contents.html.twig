@@ -1,0 +1,63 @@
+{# Cards of the contents a user created, with bulk delete.
+   Expects: contents, redirect_route, empty_text, creator_has_slider #}
+{% import '_icons.html.twig' as icons %}
+
+{% if contents is empty %}
+    <p class="empty-state">{{ empty_text }}</p>
+{% else %}
+    <div class="bulk-bar">
+        <label class="checkbox-label">
+            <input type="checkbox" data-bulk-select-all>
+            <span>Alle auswählen</span>
+        </label>
+        <form id="bulkDeleteForm" method="post" action="{{ path('app_management_bulk_delete_content') }}"
+              data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt.">
+            <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
+            <input type="hidden" name="_redirect" value="{{ redirect_route }}">
+            <button type="submit" class="btn btn-danger" data-bulk-submit disabled>{{ icons.icon('trash') }} Ausgewählte löschen</button>
+        </form>
+    </div>
+
+    <div class="content-grid">
+        {% for content in contents %}
+            {% set isArticle = content.type.value == 'article' %}
+            <article class="content-card">
+                <label class="content-card-select">
+                    <input type="checkbox" class="bulk-checkbox" name="ids[]" value="{{ content.id }}" form="bulkDeleteForm">
+                    <span class="sr-only">{{ isArticle ? content.title : 'Bild' }} auswählen</span>
+                </label>
+                <div class="content-card-thumb">
+                    {% if content.imageUrl %}
+                        <img src="{{ asset(content.imageUrl) }}" alt="" loading="lazy">
+                    {% endif %}
+                </div>
+                <div class="content-card-body">
+                    {% if isArticle %}
+                        <span class="content-card-title">{{ content.title }}</span>
+                    {% endif %}
+                    <span class="content-card-meta">
+                        <span class="badge">{{ content.type.getGermanLabel() }}</span>
+                        <span class="badge badge-accent">
+                            {%- if creator_has_slider -%}
+                                {%- if content.audienceAll -%}Alle zugewiesenen
+                                {%- elseif content.sliderItems|length > 1 -%}{{ content.sliderItems|length - 1 }} weitere
+                                {%- else -%}Nur ich
+                                {%- endif -%}
+                            {%- else -%}
+                                {{- content.audienceAll ? 'Alle Kitas' : content.sliderItems|length ~ ' Kitas' -}}
+                            {%- endif -%}
+                        </span>
+                    </span>
+                </div>
+                <div class="content-card-actions">
+                    <a href="{{ path('app_management_edit_content', {'id': content.id}) }}" class="btn btn-secondary">Bearbeiten</a>
+                    <form method="post" action="{{ path('app_management_delete_content', {'id': content.id}) }}"
+                          data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt.">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
+                        <button type="submit" class="btn btn-danger-quiet" aria-label="Löschen" title="Löschen">{{ icons.icon('trash') }}</button>
+                    </form>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+{% endif %}
