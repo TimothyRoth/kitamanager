@@ -170,6 +170,127 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertNull($this->em->getRepository(Content::class)->findOneBy(['title' => '']));
     }
 
+    private const UNSAFE_ARTICLE_TEXT = '<h2>Sommerfest</h2><p>Am <strong>Freitag</strong> ab <em>15 Uhr</em></p>'
+        . '<ul><li>Kuchen</li></ul><span style="color:red">Rot markiert</span>'
+        . '<script>window.pwned=1</script><img src="x" onerror="window.pwned=2">'
+        . '<a href="javascript:window.pwned=3">Anmeldung</a>';
+
+    public function testArticleTextKeepsEditorFormattingButNoActiveContent(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-article');
+        $form = $crawler->selectButton('Speichern')->form([
+            'content[title]' => 'Sommerfest',
+            'content[content]' => self::UNSAFE_ARTICLE_TEXT,
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('sommerfest.jpg'));
+        $this->client->submit($form);
+        self::assertResponseRedirects('/management/user#mein-slider');
+
+        $this->em->clear();
+        $stored = $this->em->getRepository(Content::class)->findOneBy(['title' => 'Sommerfest'])->getContent();
+        self::assertStringContainsString('<h2>Sommerfest</h2>', $stored);
+        self::assertStringContainsString('<strong>Freitag</strong>', $stored);
+        self::assertStringContainsString('<em>15 Uhr</em>', $stored);
+        self::assertStringContainsString('<ul><li>Kuchen</li></ul>', $stored);
+        self::assertStringContainsString('Rot markiert', $stored);
+        self::assertStringContainsString('Anmeldung', $stored);
+        $this->assertNoActiveContent($stored);
+    }
+
+    public function testUnsafeArticleTextAlreadyStoredIsCleanedOnTheSlider(): void
+    {
+        $this->seedArticle($this->kitaA, 'Altbestand')->setContent(self::UNSAFE_ARTICLE_TEXT);
+        $this->em->flush();
+
+        $this->client->request('GET', '/slider/kita-a');
+        $sliderPage = $this->client->getResponse()->getContent();
+        $this->client->request('GET', '/slider/kita-a/content');
+        $polledSlides = json_decode($this->client->getResponse()->getContent(), true)['html'];
+
+        foreach ([$sliderPage, $polledSlides] as $html) {
+            self::assertStringContainsString('<strong>Freitag</strong>', $html);
+            $this->assertNoActiveContent($html);
+        }
+    }
+
+    public function testUnsafeArticleTextAlreadyStoredIsCleanedInTheEditor(): void
+    {
+        $article = $this->seedArticle($this->kitaA, 'Altbestand');
+        $article->setContent(self::UNSAFE_ARTICLE_TEXT);
+        $this->em->flush();
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $editorText = $crawler->filter('textarea[name="content[content]"]')->text(null, false);
+
+        self::assertStringContainsString('<strong>Freitag</strong>', $editorText);
+        $this->assertNoActiveContent($editorText);
+    }
+
+    private function assertNoActiveContent(string $html): void
+    {
+        self::assertStringNotContainsString('window.pwned', $html);
+        self::assertStringNotContainsString('onerror', $html);
+        self::assertStringNotContainsString('javascript:', $html);
+        self::assertStringNotContainsString('style=', $html);
+        self::assertStringNotContainsString('<img src="x"', $html);
+    }
+
+    public function testEditingAnArticleReplacesItsTextAndImage(): void
+    {
+        $article = $this->seedArticle($this->kitaA, 'Alter Titel');
+        $uploads = static::getContainer()->getParameter('uploads_directory');
+        $oldImage = $uploads . '/' . $this->kitaA->getId() . '/alt.jpg';
+        @mkdir(dirname($oldImage), 0777, true);
+        copy($this->makeJpeg('alt.jpg'), $oldImage);
+        $article->setImageUrl('/uploads/' . $this->kitaA->getId() . '/alt.jpg');
+        $this->em->flush();
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $form = $crawler->selectButton('Änderungen speichern')->form([
+            'content[title]' => 'Neuer Titel',
+            'content[content]' => 'Neuer Text',
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('neu.jpg'));
+        $this->client->submit($form);
+        self::assertResponseRedirects('/management/user#mein-slider');
+
+        $this->em->clear();
+        $edited = $this->em->getRepository(Content::class)->find($article->getId());
+        self::assertSame('Neuer Titel', $edited->getTitle());
+        self::assertSame('Neuer Text', $edited->getContent());
+        self::assertStringContainsString('/neu', $edited->getImageUrl());
+        self::assertFileExists($uploads . str_replace('/uploads', '', $edited->getImageUrl()));
+        self::assertFileDoesNotExist($oldImage);
+    }
+
+    public function testSlidesWithTheSameOrderNumberCanStillBeReordered(): void
+    {
+        $first = $this->sliderItemOf($this->seedArticle($this->kitaA, 'Slide 1'));
+        $second = $this->sliderItemOf($this->seedArticle($this->kitaA, 'Slide 2'));
+        $first->setDisplayOrder(5);
+        $second->setDisplayOrder(5);
+        $this->em->flush();
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user');
+        $this->client->submit(
+            $crawler->filter(sprintf('form[action$="/management/slider-item/%d/move-down"]', $first->getId()))->form()
+        );
+
+        $this->em->clear();
+        $first = $this->em->getRepository(SliderItem::class)->find($first->getId());
+        $second = $this->em->getRepository(SliderItem::class)->find($second->getId());
+        self::assertGreaterThan($second->getDisplayOrder(), $first->getDisplayOrder());
+    }
+
+    private function sliderItemOf(Content $content): SliderItem
+    {
+        return $this->em->getRepository(SliderItem::class)->findOneBy(['content' => $content]);
+    }
+
     public function testDeleteContentRemovesRowAndSliderItems(): void
     {
         $content = $this->seedArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);

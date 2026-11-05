@@ -61,8 +61,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\ManyToMany(targetEntity: self::class)]
     #[ORM\JoinTable(name: 'user_publish_target')]
-    #[ORM\JoinColumn(name: 'source_user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[ORM\InverseJoinColumn(name: 'target_user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'source_user_id', referencedColumnName: 'id')]
+    #[ORM\InverseJoinColumn(name: 'target_user_id', referencedColumnName: 'id')]
     private Collection $publishTargets;
 
     /**
@@ -134,6 +134,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return array_unique($roles);
     }
 
+    public function isAdmin(): bool
+    {
+        return in_array('ROLE_ADMIN', $this->roles, true);
+    }
+
     /**
      * @param list<string> $roles
      */
@@ -202,28 +207,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getContent(): Collection
     {
         return $this->content;
-    }
-
-    public function addContent(Content $content): static
-    {
-        if (!$this->content->contains($content)) {
-            $this->content->add($content);
-            $content->setCreator($this);
-        }
-
-        return $this;
-    }
-
-    public function removeContent(Content $content): static
-    {
-        if ($this->content->removeElement($content)) {
-            // set the owning side to null (unless already changed)
-            if ($content->getCreator() === $this) {
-                $content->setCreator(null);
-            }
-        }
-
-        return $this;
     }
 
     /**

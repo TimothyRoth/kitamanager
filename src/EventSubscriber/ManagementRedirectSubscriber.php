@@ -29,17 +29,8 @@ readonly class ManagementRedirectSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $isUserOnUserPage = 'app_management_user' === $routeName;
-        $isAdminOnAdminPage = 'app_management_admin' === $routeName;
-
-        if ($this->authorizationChecker->isGranted('ROLE_ADMIN') && $isUserOnUserPage) {
-            $response = new RedirectResponse($this->router->generate('app_management_admin'));
-            $event->setResponse($response);
-        }
-
-        if (!$this->authorizationChecker->isGranted('ROLE_ADMIN') && $isAdminOnAdminPage) {
-            $response = new RedirectResponse($this->router->generate('app_management_user'));
-            $event->setResponse($response);
+        if ('app_management_user' === $routeName && $this->authorizationChecker->isGranted('ROLE_ADMIN')) {
+            $event->setResponse(new RedirectResponse($this->router->generate('app_management_admin')));
         }
     }
 

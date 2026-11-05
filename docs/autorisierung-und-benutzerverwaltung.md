@@ -6,8 +6,8 @@ Dieses Dokument beschreibt den Soll-Flow der Anwendung rund um **Login, Rollen, 
 
 - Es gibt genau zwei Rollen: `ROLE_ADMIN` (Administrator) und `ROLE_USER` (eine Kita).
 - **Jede Kita ist ein Benutzerkonto** – es gibt keine separate Kita-Entität.
-- Der Admin verwaltet alle Benutzer und legt fest, **welchen Kitas ein Ersteller Inhalte zuweisen darf** ("Zugewiesene Benutzer" bzw. "Alle Benutzer zuweisen").
-- Jede Kita hat genau **einen Slider** (TV-Anzeige), der per 4-stelliger PIN mit einem Gerät gekoppelt wird.
+- Der Admin verwaltet alle Benutzer und legt fest, **welchen Kitas ein Ersteller Inhalte zuweisen darf** ("Zugewiesene Kitas" bzw. "Allen Kitas zuweisen").
+- Jede Kita hat genau **einen Slider** (TV-Anzeige), der per 4-stelliger PIN mit einem oder mehreren Geräten gekoppelt wird.
 
 ---
 
@@ -15,7 +15,7 @@ Dieses Dokument beschreibt den Soll-Flow der Anwendung rund um **Login, Rollen, 
 
 ```mermaid
 flowchart TD
-    Start([Aufruf /login]) --> Login[Formular-Login\nBenutzername + Passwort]
+    Start([Aufruf /admin]) --> Login[Formular-Login\nBenutzername + Passwort]
     Login -->|Anmeldedaten falsch| LoginFehler[Fehlermeldung,\nzurück zum Login]
     LoginFehler --> Login
     Login -->|Anmeldung erfolgreich| RolleCheck{Rolle?}
@@ -25,15 +25,17 @@ flowchart TD
 
     subgraph AdminBereich [Admin-Bereich - nur ROLE_ADMIN]
         AdminDash --> A1[Benutzer / Kita anlegen\nRolle immer ROLE_USER]
-        AdminDash --> A2["Benutzer bearbeiten:\n- Passwort\n- Geräte-PIN (TV)\n- zugewiesene Benutzer\n- 'Alle Benutzer zuweisen'"]
+        AdminDash --> A2["Benutzer bearbeiten:\n- Benutzername\n- Passwort\n- Geräte-PIN (TV)\n- 'Zugewiesene Kitas'\n- 'Allen Kitas zuweisen'"]
         AdminDash --> A3[Benutzer löschen]
         AdminDash --> A4["Zentrale Inhalte anlegen/bearbeiten\n(Bild oder Artikel)"]
+        AdminDash --> A5[Eigenes Passwort ändern]
         A4 --> Sync
+        A1 --> Sync
         A2 --> Sync["AudienceSynchronizer:\nslider_item-Zeilen für alle\nerlaubten Empfänger-Kitas\nanlegen/entfernen"]
     end
 
     subgraph UserBereich [Kita-Bereich - ROLE_USER]
-        UserDash --> U1["Eigene Inhalte anlegen/bearbeiten\nZielgruppe nur aus eigenen\nzugewiesenen Benutzern wählbar"]
+        UserDash --> U1["Eigene Inhalte anlegen/bearbeiten\nZielgruppe nur aus eigenen\nzugewiesenen Kitas wählbar"]
         UserDash --> U2["Eigenen Slider verwalten:\n- Reihenfolge ändern\n- Slide aktivieren/deaktivieren"]
         UserDash --> U3[Slide-Dauer einstellen]
         UserDash --> U4[Eigenes Passwort ändern]
@@ -42,10 +44,10 @@ flowchart TD
 
     Sync --> Slider["Slider der Empfänger-Kita\nzeigt Inhalt (sofern aktiviert)"]
 
-    Slider --> TV["TV ruft /slider/display auf,\nPIN-Eingabe → Slider der Kita\nwird ohne Login angezeigt"]
+    Slider --> TV["TV ruft /slider/display (oder /) auf,\nPIN-Eingabe → Slider der Kita\nwird ohne Login angezeigt"]
 ```
 
-**Hinweis für Tests:** Ein Admin, der `/management/user` aufruft, wird automatisch auf `/management/admin` umgeleitet. Eine Kita, die `/management/admin` aufruft, erhält **403 Access Denied** (`access_control` verlangt `ROLE_ADMIN`); die geplante Umleitung im `ManagementRedirectSubscriber` greift dort nicht.
+**Hinweis für Tests:** Die Anmeldung liegt unter `/admin`; `/login` leitet dauerhaft (301) dorthin um. Ein Admin, der `/management/user` aufruft, wird automatisch auf `/management/admin` umgeleitet. Eine Kita, die `/management/admin` aufruft, erhält **403 Access Denied** (`access_control` verlangt `ROLE_ADMIN`).
 
 ---
 
@@ -63,11 +65,12 @@ sequenceDiagram
 
     Admin->>App: Neue Kita anlegen (Benutzername, Passwort)
     App->>DB: user speichern (roles = ROLE_USER)
+    App->>DB: bestehende "an alle"-Inhalte von Erstellern<br/>mit "Allen Kitas zuweisen" an die neue Kita ausspielen
     App-->>Admin: Kita erscheint in Benutzerliste
 
-    Admin->>App: Kita bearbeiten: Benutzer zuweisen<br/>oder "Alle Benutzer zuweisen"
+    Admin->>App: Kita bearbeiten: "Zugewiesene Kitas" wählen<br/>oder "Allen Kitas zuweisen"
     App->>DB: user_publish_target bzw. publish_to_all aktualisieren
-    App->>DB: Slider-Einträge synchronisieren<br/>(Inhalte bei entfernten Zielen zurückziehen,<br/>bei neuen Zielen ausspielen)
+    App->>DB: Slider-Einträge synchronisieren<br/>(Inhalte bei entfernten Zielen zurückziehen,<br/>"an alle"-Inhalte bei neuen Zielen ausspielen)
 
     Admin->>App: Geräte-PIN für Kita setzen (4-stellig)
     App->>DB: device_pin speichern
@@ -75,7 +78,7 @@ sequenceDiagram
     Kita->>App: Login (ROLE_USER)
     App-->>Kita: Kita-Dashboard /management/user
     Kita->>App: Inhalt anlegen, Zielgruppe wählen
-    Note over Kita,App: Auswählbar sind nur die eigene Kita<br/>und vom Admin zugewiesene Benutzer
+    Note over Kita,App: Auswählbar sind nur vom Admin zugewiesene Kitas.<br/>Der eigene Slider erhält den Inhalt immer.
     App->>DB: content + slider_item je Empfänger anlegen
 ```
 
@@ -150,34 +153,44 @@ classDiagram
 ### Login & Rollen
 - [ ] Login mit falschen Daten schlägt fehl, Fehlermeldung erscheint.
 - [ ] Admin landet nach Login auf `/management/admin`, Kita auf `/management/user`.
-- [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied; Doc-Soll „Umleitung“ greift nicht, weil `access_control` vorher blockiert).
+- [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
 - [ ] Logout beendet die Sitzung.
 
 ### Benutzerverwaltung (nur Admin)
 - [ ] Admin kann neue Kita anlegen; sie erscheint in der Benutzerliste.
+- [ ] Der Benutzername ist Pflicht und darf keinen Schrägstrich enthalten. Ein Name, der dieselbe Slider-Adresse ergäbe wie ein vorhandener (z. B. "Kita A" neben "kita-a"), wird abgelehnt.
 - [ ] Admin kann Passwort einer Kita ändern.
+- [ ] Admin kann das eigene Passwort im Dashboard ändern (aktuelles Passwort erforderlich).
 - [ ] Admin kann einer Kita eine 4-stellige Geräte-PIN zuweisen; PIN muss eindeutig sein.
-- [ ] Admin kann einer Kita "zugewiesene Benutzer" geben oder "Alle Benutzer zuweisen" aktivieren.
-- [ ] Admin kann Kita löschen; deren Inhalte/Slider-Einträge verschwinden.
+- [ ] Admin kann einer Kita "Zugewiesene Kitas" geben oder "Allen Kitas zuweisen" aktivieren.
+- [ ] Admin kann Kita löschen; deren Inhalte, Slider-Einträge und Zuweisungen (als Ersteller wie als Ziel) verschwinden.
+- [ ] Admin-Konten lassen sich nicht löschen.
 
 ### Inhalte & Zuweisung
-- [ ] Kita sieht bei "Sichtbar für" nur sich selbst und die vom Admin zugewiesenen Benutzer.
+- [ ] Kita sieht bei "Sichtbar für ausgewählte Kitas" nur die vom Admin zugewiesenen Kitas (sich selbst nicht – der eigene Slider erhält den Inhalt immer). Ohne zugewiesene Kitas erscheint keine Zielgruppen-Auswahl.
 - [ ] Zentrale Inhalte des Admins erscheinen im Slider aller erlaubten Kitas.
 - [ ] Entzieht der Admin einer Kita ein Ziel, verschwinden dort die bereits ausgespielten Inhalte dieses Erstellers.
 - [ ] Nur der Ersteller (oder Admin) kann einen Inhalt bearbeiten/löschen.
+- [ ] Artikeltext behält die Formatierung des Editors (Überschriften, fett, kursiv, Listen). Skripte, Bilder, Links und sonstiges eingefügtes HTML werden entfernt; der Text darin bleibt erhalten.
+- [ ] Fotos erscheinen aufrecht, auch wenn die Drehung nur in den Bilddaten (EXIF) vermerkt ist.
 
 ### Slider
 - [ ] Kita kann Reihenfolge der eigenen Slides ändern (hoch/runter).
 - [ ] Kita kann eigene Inhalte im Slider aktivieren/deaktivieren – wirkt nur auf ihren Slider.
 - [ ] Von anderen zugewiesene Inhalte sind im Empfänger-Slider nicht aktivier-/deaktivierbar.
-- [ ] Kita kann die Anzeigedauer pro Slide einstellen.
+- [ ] Kita kann die Anzeigedauer pro Slide einstellen (1–60 Sekunden).
 - [ ] Kita kann Slides anderer Kitas nicht verwalten (direkte URL-Aufrufe werden abgelehnt).
 
 ### TV-Anzeige (ohne Login)
+- [ ] `/` zeigt die PIN-Eingabe direkt an (ohne Umleitung).
 - [ ] `/slider/display`: korrekte PIN führt zum Slider der richtigen Kita.
+- [ ] Ein bereits gekoppeltes Gerät landet beim erneuten Aufruf von `/slider/display` direkt im Slider.
 - [ ] Falsche PIN wird abgelehnt.
 - [ ] Ändert/entfernt der Admin die PIN, zeigt das gekoppelte TV wieder die PIN-Eingabe ("unlinked").
 - [ ] Slider zeigt ein erkennbares PIN-Wasserzeichen, wenn eine Geräte-PIN gesetzt ist.
 - [ ] Admin sieht in der Benutzerliste und beim Bearbeiten, ob/mit welcher PIN der Slider erreichbar ist.
 - [ ] Neue/aktivierte Inhalte erscheinen ohne Neuladen auf dem TV (regelmäßige Abfrage).
+- [ ] Wird eine Kita umbenannt, zeigen ihre gekoppelten Fernseher weiter ihre Inhalte.
+- [ ] Wird eine Kita gelöscht, zeigen ihre gekoppelten Fernseher wieder die PIN-Eingabe.
+- [ ] Angemeldete Benutzer können die Vorschau jedes Sliders ansehen, auch wenn im selben Browser früher eine PIN eingegeben wurde.

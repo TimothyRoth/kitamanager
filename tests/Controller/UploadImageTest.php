@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -164,6 +165,29 @@ final class UploadImageTest extends AppWebTestCase
 
         self::assertSame(422, $response->getStatusCode());
         self::assertFalse($body['ok']);
+    }
+
+    public function testStorageFailureIsReportedAndLogged(): void
+    {
+        $uploadFolder = static::getContainer()->getParameter('uploads_directory') . '/' . $this->user->getId();
+        $filesystem = new Filesystem();
+        $filesystem->remove($uploadFolder);
+        $filesystem->dumpFile($uploadFolder, 'a file where the upload folder should be');
+        $logFile = static::getContainer()->getParameter('kernel.logs_dir') . '/test.log';
+        $logSizeBefore = is_file($logFile) ? filesize($logFile) : 0;
+
+        try {
+            $this->postImage($this->makeJpeg('unstorable.jpg', 80, 60), 'unstorable.jpg', 'image/jpeg');
+        } finally {
+            $filesystem->remove($uploadFolder);
+        }
+
+        self::assertSame(500, $this->client->getResponse()->getStatusCode());
+        self::assertFalse(json_decode($this->client->getResponse()->getContent(), true)['ok']);
+        self::assertStringContainsString(
+            'Storing an uploaded image failed',
+            (string) file_get_contents($logFile, false, null, $logSizeBefore)
+        );
     }
 
     public function testOriginalAboveHardCapIsRejected(): void

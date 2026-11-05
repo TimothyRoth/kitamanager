@@ -34,6 +34,7 @@ class SliderItemRepository extends ServiceEntityRepository
             ->andWhere('si.isEnabled = true OR c.creator != :consumer')
             ->setParameter('consumer', $consumer)
             ->orderBy('si.displayOrder', 'ASC')
+            ->addOrderBy('si.id', 'ASC')
             ->getQuery()
             ->getResult();
     }
@@ -51,6 +52,7 @@ class SliderItemRepository extends ServiceEntityRepository
             ->andWhere('si.consumer = :consumer')
             ->setParameter('consumer', $consumer)
             ->orderBy('si.displayOrder', 'ASC')
+            ->addOrderBy('si.id', 'ASC')
             ->getQuery()
             ->getResult();
     }

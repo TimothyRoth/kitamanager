@@ -16,7 +16,7 @@
             <div class="tv-article-content">
                 <div class="tv-article-title">{{ content.title }}</div>
                 <div class="tv-article-body">
-                    {{ content.content|raw }}
+                    {{ content.content|default('')|sanitize_html('article_body') }}
                 </div>
             </div>
         </div>

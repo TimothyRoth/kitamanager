@@ -12,12 +12,24 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Regex;
 
 class UserType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->add('username', options: ['label' => 'Benutzername']);
+        $builder->add('username', options: [
+            'label' => 'Benutzername',
+            'constraints' => [
+                new NotBlank(message: 'Bitte geben Sie einen Benutzernamen ein.'),
+                new Length(max: 180, maxMessage: 'Der Benutzername darf höchstens {{ limit }} Zeichen lang sein.'),
+                new Regex(
+                    pattern: '#/#',
+                    match: false,
+                    message: 'Der Benutzername darf keinen Schrägstrich (/) enthalten.',
+                ),
+            ],
+        ]);
 
         $passwordConstraints = [
             new Length(

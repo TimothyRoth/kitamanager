@@ -73,9 +73,7 @@ class AudienceSynchronizer
             }
         }
 
-        // A content is always delivered to its creator (unless the creator is
-        // a pure manager, e.g. the admin, who has no slider).
-        if ($this->isConsumer($creator)) {
+        if (!$creator->isAdmin()) {
             $desired[$creator->getId()] = $creator;
         }
 
@@ -144,7 +142,7 @@ class AudienceSynchronizer
      */
     public function onUserCreated(User $newUser): void
     {
-        if (!$this->isConsumer($newUser)) {
+        if ($newUser->isAdmin()) {
             return;
         }
 
@@ -220,10 +218,5 @@ class AudienceSynchronizer
         }
 
         return $this->nextOrderCache[$id];
-    }
-
-    private function isConsumer(User $user): bool
-    {
-        return !in_array('ROLE_ADMIN', $user->getRoles(), true);
     }
 }

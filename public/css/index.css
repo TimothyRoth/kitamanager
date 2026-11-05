@@ -1,6 +1,0 @@
-/* Entry bundle kept for convenience; HTML loads each file via asset() with ?v=. */
-@import 'basics.css';
-@import 'layout.css';
-@import 'components.css';
-@import 'management.css';
-@import 'slider.css';

@@ -4,10 +4,9 @@
 {% block body_class %}management{% endblock %}
 
 {# Login must work on constrained browsers (e.g. Smart-TV browsers used for
-   kiosk checks): no ES6 script.js, no Turbo/Stimulus importmap. The form is
-   a plain HTML POST and does not need client-side JS. #}
+   kiosk checks): no ES6 script.js. The form is a plain HTML POST and does
+   not need client-side JS. #}
 {% block app_javascripts %}{% endblock %}
-{% block importmap %}{% endblock %}
 
 {% block body %}
     <div class="container">

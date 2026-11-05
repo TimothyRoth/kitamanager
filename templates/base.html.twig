@@ -6,7 +6,7 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="mobile-web-app-capable" content="yes">
         <title>{% block title %}Willkommen!{% endblock %}</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>sf</text></svg>">
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>📺</text></svg>">
 
         {# Default: full management stack. TV / PIN pages override stylesheets
            to a leaner set so old embedded browsers are not fed modern CSS. #}
@@ -18,13 +18,10 @@
             <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
         {% endblock %}
 
-        {# Default: modern management JS (ES6+) + Turbo. TV pages MUST override
-           app_javascripts with tv.js and empty the importmap block. #}
+        {# Default: modern management JS (ES6+). TV pages MUST override
+           app_javascripts with the ES5-only tv.js. #}
         {% block app_javascripts %}
             <script src="{{ asset('js/script.js') }}" defer></script>
-        {% endblock %}
-        {% block javascripts %}
-            {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
 
         {% set frankenphpHotReload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
@@ -34,7 +31,7 @@
         <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
         {% endif %}
     </head>
-    <body class="{% block body_class %}{% endblock %}" data-turbo-scroll="false">
+    <body class="{% block body_class %}{% endblock %}">
         {% block body %}{% endblock %}
     </body>
 </html>

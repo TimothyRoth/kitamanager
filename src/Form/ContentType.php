@@ -5,12 +5,15 @@ namespace App\Form;
 use App\Entity\Content;
 use App\Entity\User;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\CallbackTransformer;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\All;
 use Symfony\Component\Validator\Constraints\Image;
@@ -18,6 +21,11 @@ use Symfony\Component\Validator\Constraints\NotBlank;
 
 class ContentType extends AbstractType
 {
+    public function __construct(
+        #[Target('article_body')] private readonly HtmlSanitizerInterface $articleBodySanitizer,
+    ) {
+    }
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         // Images larger than 3MB are downscaled server-side to the TV limit;
@@ -76,6 +84,11 @@ class ContentType extends AbstractType
                     'attr' => ['class' => 'wysiwyg'],
                     'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Inhalt an.')],
                 ]);
+
+            $builder->get('content')->addModelTransformer(new CallbackTransformer(
+                $this->sanitizeArticleBody(...),
+                $this->sanitizeArticleBody(...),
+            ));
         }
 
         // Audience selection is only shown when the creator may publish to others.
@@ -102,6 +115,11 @@ class ContentType extends AbstractType
                 'attr' => ['data-audience-list' => ''],
             ]);
         }
+    }
+
+    private function sanitizeArticleBody(?string $html): ?string
+    {
+        return null === $html ? null : $this->articleBodySanitizer->sanitize($html);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

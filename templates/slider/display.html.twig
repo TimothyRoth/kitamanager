@@ -2,7 +2,7 @@
 
 {% block title %}PIN eingeben{% endblock %}
 
-{# TV pages: ES5-only tv.js, no Turbo/importmap. CSS is a dedicated tv.css
+{# TV pages: ES5-only tv.js instead of script.js. CSS is a dedicated tv.css
    without custom properties / Grid (Philips TPM181HE Chrome/49 reports both
    as unsupported). #}
 {% block stylesheets %}
@@ -11,7 +11,6 @@
 {% block app_javascripts %}
     <script src="{{ asset('js/tv.js') }}" defer></script>
 {% endblock %}
-{% block importmap %}{% endblock %}
 
 {% block body %}
     <div class="container">
