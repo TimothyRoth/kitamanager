@@ -198,6 +198,17 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseRedirects('/management/admin');
     }
 
+    public function testLoginPageSendsLoggedInUsersToTheirDashboard(): void
+    {
+        $this->client->loginUser($this->admin);
+        $this->client->request('GET', '/admin');
+        self::assertResponseRedirects('/management/admin');
+
+        $this->client->loginUser($this->kitaA);
+        $this->client->request('GET', '/admin');
+        self::assertResponseRedirects('/management/user');
+    }
+
     public function testLogoutEndsSession(): void
     {
         $this->client->loginUser($this->admin);

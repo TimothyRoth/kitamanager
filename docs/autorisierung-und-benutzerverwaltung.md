@@ -153,6 +153,7 @@ classDiagram
 ### Login & Rollen
 - [ ] Login mit falschen Daten schlägt fehl, Fehlermeldung erscheint.
 - [ ] Admin landet nach Login auf `/management/admin`, Kita auf `/management/user`.
+- [ ] Wer bereits angemeldet ist und `/admin` aufruft, landet direkt im eigenen Dashboard.
 - [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
 - [ ] Logout beendet die Sitzung.

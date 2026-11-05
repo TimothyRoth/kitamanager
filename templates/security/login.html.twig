@@ -23,37 +23,31 @@
                 <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
             {% endif %}
 
-            {% if app.user %}
-                <div class="alert alert-success">
-                    Sie sind angemeldet als {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">Abmelden</a>
+            <h1>Anmelden</h1>
+
+            <div class="form-row">
+                <label for="username">Benutzername</label>
+                <input type="text" value="{{ last_username }}" name="_username" id="username"
+                       autocomplete="username" required autofocus
+                       autocapitalize="none" autocorrect="off" spellcheck="false">
+            </div>
+
+            <div class="form-row">
+                <label for="password">Passwort</label>
+                <div class="password-field">
+                    <input type="password" name="_password" id="password" autocomplete="current-password" required>
+                    {{- include('form/_password_toggle.html.twig') -}}
                 </div>
-            {% else %}
-                <h1>Anmelden</h1>
+            </div>
 
-                <div class="form-row">
-                    <label for="username">Benutzername</label>
-                    <input type="text" value="{{ last_username }}" name="_username" id="username"
-                           autocomplete="username" required autofocus
-                           autocapitalize="none" autocorrect="off" spellcheck="false">
-                </div>
+            <label class="checkbox-label">
+                <input type="checkbox" name="_remember_me">
+                <span>Angemeldet bleiben</span>
+            </label>
 
-                <div class="form-row">
-                    <label for="password">Passwort</label>
-                    <div class="password-field">
-                        <input type="password" name="_password" id="password" autocomplete="current-password" required>
-                        {{- include('form/_password_toggle.html.twig') -}}
-                    </div>
-                </div>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
 
-                <label class="checkbox-label">
-                    <input type="checkbox" name="_remember_me">
-                    <span>Angemeldet bleiben</span>
-                </label>
-
-                <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
-
-                <button class="btn btn-primary btn-large btn-block" type="submit">Anmelden</button>
-            {% endif %}
+            <button class="btn btn-primary btn-large btn-block" type="submit">Anmelden</button>
         </form>
     </main>
 {% endblock %}
