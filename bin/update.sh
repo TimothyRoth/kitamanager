@@ -28,11 +28,34 @@ backup_databases() {
     done
 }
 
+has_app_secret() {
+    as_app_user "$PHP" -r '
+        require "vendor/autoload.php";
+        (new Symfony\Component\Dotenv\Dotenv())->bootEnv(".env");
+        exit("" === ($_SERVER["APP_SECRET"] ?? "") ? 1 : 0);
+    '
+}
+
+# The login needs a secret and the repository ships none. A machine without
+# one gets its own, once, in .env.local (which git ignores).
+ensure_app_secret() {
+    if has_app_secret; then
+        return
+    fi
+
+    printf 'APP_SECRET=%s\n' "$("$PHP" -r 'echo bin2hex(random_bytes(32));')" >> .env.local
+    chown "$APP_USER:$APP_USER" .env.local
+    chmod 640 .env.local
+    echo "Created an APP_SECRET in .env.local."
+}
+
 backup_databases
 chown -R "$APP_USER:$APP_USER" .
 
 as_app_user "$PHP" "$(command -v composer)" install --no-interaction
+ensure_app_secret
 as_app_user "$PHP" bin/console doctrine:migrations:migrate --no-interaction
 as_app_user "$PHP" bin/console cache:clear
+as_app_user "$PHP" bin/health-check.php
 
 echo "Update finished."
