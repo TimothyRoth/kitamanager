@@ -1,39 +1,30 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block body_class %}management{% endblock %}
 
 {% block body %}
-    <div class="container">
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endfor %}
+    {{ include('management/_header.html.twig') }}
 
-        <div class="surface">
+    <main class="page page-narrow">
+        <a href="{{ path('app_management_user') }}" class="back-link">{{ icons.icon('back') }} Zurück zum Dashboard</a>
+        {{ include('management/_flashes.html.twig') }}
+
+        <section class="panel">
             <h1>{{ page_title }}</h1>
 
             {% if content.imageUrl %}
-                <div style="margin-bottom: var(--spacing-md);">
-                    <p><strong>Aktuelles Bild:</strong></p>
-                    <img src="{{ asset(content.imageUrl) }}" alt="{{ content.title }}" class="current-image-preview">
-                </div>
+                <figure class="current-image">
+                    <img src="{{ asset(content.imageUrl) }}" alt="{{ content.title }}">
+                    <figcaption>Aktuelles Bild</figcaption>
+                </figure>
             {% endif %}
 
             {{ form_start(form, {'attr': {'data-upload-with-progress': ''}}) }}
-            <div class="form-group">
-                {{ form_widget(form) }}
-            </div>
-            <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+            {{ form_widget(form) }}
+            <button type="submit" class="btn btn-primary btn-large">Änderungen speichern</button>
             {{ form_end(form) }}
-
-            <div style="margin-top: var(--spacing-md);">
-                <a href="{{ path(app.user ? 'app_management_user' : 'app_management_admin') }}" class="btn btn-link">Zurück
-                    zum Dashboard</a>
-            </div>
-        </div>
-    </div>
+        </section>
+    </main>
 {% endblock %}

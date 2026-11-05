@@ -1,5 +1,38 @@
 {% extends 'form_div_layout.html.twig' %}
 
+{% block form_row -%}
+    {%- set row_attr = row_attr|merge({class: (row_attr.class|default('') ~ ' form-row')|trim}) -%}
+    {{- parent() -}}
+{%- endblock %}
+
+{% block checkbox_row -%}
+    <div class="form-row form-row-checkbox">
+        <label class="checkbox-label">
+            {{- form_widget(form) -}}
+            <span>{{ label }}</span>
+        </label>
+        {{- form_errors(form) -}}
+        {{- form_help(form) -}}
+    </div>
+{%- endblock %}
+
+{% block password_widget -%}
+    <div class="password-field">
+        {{- parent() -}}
+        {{- include('form/_password_toggle.html.twig') -}}
+    </div>
+{%- endblock %}
+
+{% block form_errors -%}
+    {%- if errors|length > 0 -%}
+        <ul class="form-errors">
+            {%- for error in errors -%}
+                <li>{{ error.message }}</li>
+            {%- endfor -%}
+        </ul>
+    {%- endif -%}
+{%- endblock %}
+
 {# Wrap each expanded choice (checkbox/radio) in its own .form-check so the list
    can be laid out as a scrollable, multi-column grid that scales to hundreds of
    entries. Also exposes a .choice-list hook on the container. #}

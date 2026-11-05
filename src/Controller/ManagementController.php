@@ -18,6 +18,7 @@ use App\Service\AudienceSynchronizer;
 use App\Service\ImageDownscaleException;
 use App\Service\ImageDownscaler;
 use App\Service\ImageUploader;
+use App\Service\SliderOrder;
 use App\Service\UserPasswordUpdater;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -546,30 +547,20 @@ final class ManagementController extends AbstractController
         return $this->redirectToRoute($redirectRoute);
     }
 
-    #[Route('/slider-item/{id}/move-up', name: 'app_management_slider_move_up', methods: ['POST'])]
-    public function moveSliderItemUp(Request $request, SliderItem $item, EntityManagerInterface $entityManager, SliderItemRepository $sliderItemRepository): Response
+    #[Route('/slider-item/reorder', name: 'app_management_slider_reorder', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function reorderSlider(Request $request, SliderOrder $sliderOrder, EntityManagerInterface $entityManager): Response
     {
-        $this->denyAccessUnlessGranted('MANAGE', $item);
-
-        if ($this->isCsrfTokenValid('move-up' . $item->getId(), $request->request->get('_token'))) {
-            $this->moveSliderItem($item, -1, $sliderItemRepository);
-            $entityManager->flush();
+        if (!$this->isCsrfTokenValid('reorder-slider', $request->request->getString('_token'))) {
+            throw $this->createAccessDeniedException();
         }
 
-        return $this->redirectToRoute('app_management_user');
-    }
+        /** @var User $consumer */
+        $consumer = $this->getUser();
+        $sliderOrder->arrange($consumer, array_map('intval', $request->request->all('ids')));
+        $entityManager->flush();
 
-    #[Route('/slider-item/{id}/move-down', name: 'app_management_slider_move_down', methods: ['POST'])]
-    public function moveSliderItemDown(Request $request, SliderItem $item, EntityManagerInterface $entityManager, SliderItemRepository $sliderItemRepository): Response
-    {
-        $this->denyAccessUnlessGranted('MANAGE', $item);
-
-        if ($this->isCsrfTokenValid('move-down' . $item->getId(), $request->request->get('_token'))) {
-            $this->moveSliderItem($item, 1, $sliderItemRepository);
-            $entityManager->flush();
-        }
-
-        return $this->redirectToRoute('app_management_user');
+        return new Response(null, Response::HTTP_NO_CONTENT);
     }
 
     #[Route('/slider-item/{id}/toggle-status', name: 'app_management_slider_toggle_status', methods: ['POST'])]
@@ -587,23 +578,6 @@ final class ManagementController extends AbstractController
         }
 
         return $this->redirectToRoute('app_management_user');
-    }
-
-    private function moveSliderItem(SliderItem $item, int $offset, SliderItemRepository $repository): void
-    {
-        $items = $repository->findAllForConsumer($item->getConsumer());
-        $position = array_search($item, $items, true);
-        $newPosition = $position + $offset;
-
-        if (!isset($items[$newPosition])) {
-            return;
-        }
-
-        [$items[$position], $items[$newPosition]] = [$items[$newPosition], $items[$position]];
-
-        foreach ($items as $index => $sliderItem) {
-            $sliderItem->setDisplayOrder($index + 1);
-        }
     }
 
     /**

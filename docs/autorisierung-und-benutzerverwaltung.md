@@ -156,6 +156,9 @@ classDiagram
 - [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
 - [ ] Logout beendet die Sitzung.
+- [ ] Mit "Angemeldet bleiben" bleibt die Anmeldung 30 Tage bestehen, auch nach dem Schließen des Browsers; ohne den Haken endet sie mit der Sitzung.
+- [ ] Passwortfelder lassen sich über das Augen-Symbol im Klartext anzeigen und wieder verbergen.
+- [ ] Der Umschalter in der Kopfzeile wechselt zwischen hellem und dunklem Design; die Wahl bleibt auf dem Gerät gespeichert, ohne Wahl gilt die Geräteeinstellung.
 
 ### Benutzerverwaltung (nur Admin)
 - [ ] Admin kann neue Kita anlegen; sie erscheint in der Benutzerliste.
@@ -176,7 +179,7 @@ classDiagram
 - [ ] Fotos erscheinen aufrecht, auch wenn die Drehung nur in den Bilddaten (EXIF) vermerkt ist.
 
 ### Slider
-- [ ] Kita kann Reihenfolge der eigenen Slides ändern (hoch/runter).
+- [ ] Kita kann die Reihenfolge der Slides im eigenen Slider ändern: Zeile am Griff ziehen (Maus oder Finger) oder Griff fokussieren und Pfeiltasten hoch/runter drücken. Die Reihenfolge wird sofort gespeichert.
 - [ ] Kita kann eigene Inhalte im Slider aktivieren/deaktivieren – wirkt nur auf ihren Slider.
 - [ ] Von anderen zugewiesene Inhalte sind im Empfänger-Slider nicht aktivier-/deaktivierbar.
 - [ ] Kita kann die Anzeigedauer pro Slide einstellen (1–60 Sekunden).

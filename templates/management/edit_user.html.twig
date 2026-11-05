@@ -1,48 +1,48 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}Bearbeiten{% endblock %}
 {% block body_class %}management{% endblock %}
 
 {% block body %}
-    <div class="container">
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endfor %}
+    {{ include('management/_header.html.twig') }}
 
-        <div class="surface">
-            <h1>In Bearbeitung: {{ user.username }}</h1>
+    <main class="page page-narrow">
+        <a href="{{ path('app_management_admin') }}" class="back-link">{{ icons.icon('back') }} Zurück zum Dashboard</a>
+        {{ include('management/_flashes.html.twig') }}
+
+        <section class="panel">
+            <header class="panel-header">
+                <span class="avatar" aria-hidden="true">{{ user.username|split(' ', 2)|last|first|upper }}</span>
+                <div class="panel-heading">
+                    <h1>{{ user.username }}</h1>
+                    <p>Konto und Zuweisungen bearbeiten.</p>
+                </div>
+            </header>
 
             {{ form_start(form) }}
-            <div class="form-group">
-                {{ form_row(form.username) }}
-            </div>
-            <div class="form-group">
-                {{ form_row(form.plainPassword, {'required': false, 'label': 'Neues Passwort (nur nötig bei Änderung)'}) }}
-            </div>
-            <div class="form-group">
-                {{ form_row(form.publishToAll) }}
-            </div>
-            <div class="form-group" data-publish-targets>
+            {{ form_row(form.username) }}
+            {{ form_row(form.plainPassword, {'required': false, 'label': 'Neues Passwort (nur nötig bei Änderung)'}) }}
+            {{ form_row(form.publishToAll) }}
+            <div data-publish-targets>
                 {{ form_row(form.publishTargets) }}
             </div>
             <button type="submit" class="btn btn-primary">Änderungen speichern</button>
             {{ form_end(form) }}
-        </div>
+        </section>
 
-        <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Fernseher zuordnen</h2>
-            <p>
-                Legen Sie hier eine 4-stellige PIN für diesen Benutzer fest. Die PIN wird
-                einmalig auf dem Fernseher unter
-                <a href="{{ path('app_slider_display') }}"><code>{{ path('app_slider_display') }}</code></a>
-                eingegeben –
-                der Fernseher merkt sich die Verbindung und zeigt dann automatisch den
-                Slider dieses Benutzers an. Mehrere Fernseher können dieselbe PIN verwenden.
-            </p>
+        <section class="panel">
+            <header class="panel-header">
+                <span class="panel-icon">{{ icons.icon('tv') }}</span>
+                <div class="panel-heading">
+                    <h2>Fernseher zuordnen</h2>
+                    <p>
+                        Die 4-stellige PIN wird einmalig auf dem Fernseher unter
+                        <a href="{{ path('app_slider_display') }}"><code>{{ path('app_slider_display') }}</code></a>
+                        eingegeben. Mehrere Fernseher können dieselbe PIN verwenden.
+                    </p>
+                </div>
+            </header>
 
             {% if user.devicePin %}
                 <div class="alert alert-success pin-reachability" role="status">
@@ -58,15 +58,9 @@
             {% endif %}
 
             {{ form_start(devicePinForm) }}
-            <div class="form-group">
-                {{ form_row(devicePinForm.devicePin) }}
-            </div>
+            {{ form_row(devicePinForm.devicePin) }}
             <button type="submit" class="btn btn-primary">PIN speichern</button>
             {{ form_end(devicePinForm) }}
-        </div>
-
-        <div class="surface" style="margin-top: var(--spacing-md);">
-            <a href="{{ path('app_management_admin') }}" class="btn btn-link">Zurück zum Dashboard</a>
-        </div>
-    </div>
+        </section>
+    </main>
 {% endblock %}

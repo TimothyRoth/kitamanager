@@ -8,19 +8,29 @@
         <title>{% block title %}Willkommen!{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>📺</text></svg>">
 
-        {# Default: full management stack. TV / PIN pages override stylesheets
-           to a leaner set so old embedded browsers are not fed modern CSS. #}
+        {# Default: the management stack with its light/dark theme. TV / PIN pages
+           replace this block with a leaner set so old embedded browsers are fed
+           neither modern CSS nor the theme script. #}
         {% block stylesheets %}
+            <meta name="color-scheme" content="light dark">
+            <script>
+                (function () {
+                    var stored = null;
+                    try { stored = window.localStorage.getItem('km-theme'); } catch (e) {}
+                    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    document.documentElement.setAttribute('data-theme', (stored || (prefersDark ? 'dark' : 'light')));
+                })();
+            </script>
             <link rel="stylesheet" href="{{ asset('css/basics.css') }}">
             <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
             <link rel="stylesheet" href="{{ asset('css/components.css') }}">
             <link rel="stylesheet" href="{{ asset('css/management.css') }}">
-            <link rel="stylesheet" href="{{ asset('css/slider.css') }}">
         {% endblock %}
 
         {# Default: modern management JS (ES6+). TV pages MUST override
            app_javascripts with the ES5-only tv.js. #}
         {% block app_javascripts %}
+            <script src="{{ asset('js/password-toggle.js') }}" defer></script>
             <script src="{{ asset('js/script.js') }}" defer></script>
         {% endblock %}
 

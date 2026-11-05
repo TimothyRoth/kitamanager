@@ -1,567 +1,353 @@
-/**
- * Administration UI – primary target: iPad (A16 / 11th gen, 2025).
- *
- * Viewport reference (CSS px, scale 2):
- *   Portrait  820 × 1180
- *   Landscape 1180 × 820
- *
- * Layout bands:
- *   ≤ 819px   phones / narrow – stacked cards, full-width actions
- *   ≥ 820px   iPad landscape+ / desktop – compact horizontal item rows
- *
- * Scoped to body.management so TV slider pages stay untouched.
- */
+/* What the dashboards are made of: the sortable slider, the content cards,
+   the Kita list and the pieces of the edit pages. */
 
-body.management {
-    -webkit-tap-highlight-color: rgba(15, 23, 42, 0.12);
-    touch-action: manipulation;
-}
+/* ---- Mein Slider: compact, sortable rows ----------------------------- */
 
-/* ------------------------------------------------------------------ */
-/*  Touch-sized controls (iPad-first; desktop overrides below)         */
-/* ------------------------------------------------------------------ */
-
-body.management .btn,
-body.management button:not(.wysiwyg-btn):not(.image-preview-remove) {
-    min-height: var(--touch-target);
-    padding: 0.65rem 1.15rem;
-}
-
-body.management .btn-link,
-body.management button.btn-link,
-body.management a.btn-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--touch-target);
-    min-width: var(--touch-target);
-    padding: 0.5rem 0.85rem;
-    border-radius: var(--border-radius);
-}
-
-body.management .btn-link:active,
-body.management button.btn-link:active {
-    background-color: var(--color-bg);
-}
-
-body.management .btn-icon {
-    min-width: var(--touch-target);
-    min-height: var(--touch-target);
-    padding: 0.5rem;
-    border-radius: var(--border-radius);
-}
-
-body.management .btn-icon svg {
-    width: 1.5rem;
-    height: 1.5rem;
-}
-
-body.management .btn-icon:active {
-    background-color: var(--color-bg);
-    color: var(--color-primary);
-}
-
-body.management .status-toggle {
-    min-height: var(--touch-target);
-    padding: 0.55rem 1.1rem;
-    font-size: 1rem;
-}
-
-body.management .status-toggle-hint {
-    display: block;
-}
-
-body.management .wysiwyg-btn {
-    min-height: var(--touch-target);
-    min-width: var(--touch-target);
-    padding: 0.5rem 0.75rem;
-    font-size: 1rem;
-}
-
-body.management input[type="text"],
-body.management input[type="password"],
-body.management input[type="number"],
-body.management textarea,
-body.management select,
-body.management input[type="file"] {
-    min-height: var(--touch-target);
-    padding: 0.65rem 0.85rem;
-}
-
-body.management input[type="checkbox"],
-body.management input[type="radio"] {
-    width: 1.35rem;
-    height: 1.35rem;
-    accent-color: var(--color-primary);
-    flex-shrink: 0;
-}
-
-body.management .cell-checkbox-col {
-    flex: 0 0 auto;
-    min-width: var(--touch-target);
-}
-
-body.management .cell-checkbox input[type="checkbox"] {
-    width: 1.35rem;
-    height: 1.35rem;
-    margin: 0;
-}
-
-body.management .form-check {
-    min-height: var(--touch-target);
-    padding: 0.45rem 0.25rem;
-    gap: var(--spacing-sm);
-}
-
-body.management .choice-list {
-    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-    max-height: 24rem;
-    gap: var(--spacing-sm);
-    -webkit-overflow-scrolling: touch;
-}
-
-body.management .choice-picker .choice-list {
-    max-height: 28rem;
-}
-
-body.management .choice-picker-toolbar .btn-link {
-    min-height: 2.25rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-bg);
-    border-radius: var(--border-radius);
-}
-
-body.management .choice-filter {
-    min-height: var(--touch-target);
-}
-
-body.management .image-preview-remove {
-    top: -0.35rem;
-    right: -0.35rem;
-    /* Visible circle stays compact; ::after expands the tap target for iPad */
-    width: 1.5rem;
-    height: 1.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1;
-    padding: 0 0 0.1em;
-}
-
-body.management .image-preview-remove::after {
-    content: '';
-    position: absolute;
-    inset: -0.45rem;
-}
-
-body.management .image-preview-grid img,
-body.management .image-preview-tile {
-    max-width: 9rem;
-}
-
-body.management .image-preview-grid img {
-    max-height: 9rem;
-}
-
-body.management .thumbnail {
-    max-width: 4rem;
-    max-height: 4rem;
-    width: auto;
-    height: auto;
-    object-fit: cover;
-    border-radius: var(--border-radius);
-}
-
-body.management .current-image-preview {
-    display: block;
-    max-width: min(100%, 20rem);
-    margin: var(--spacing-sm) 0 var(--spacing-md);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-}
-
-body.management .table-actions {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0;
-}
-
-body.management .table-actions .form-inline {
-    display: inline-flex;
-    margin: 0;
-    flex: 0 0 auto;
-}
-
-/* Compact reorder controls so both arrows stay in the order column */
-body.management .cell-order .btn-icon {
-    min-width: 2rem;
-    min-height: 2.25rem;
-    padding: 0.15rem;
-}
-
-body.management .cell-order .btn-icon svg {
-    width: 1.15rem;
-    height: 1.15rem;
-}
-
-body.management .btn-block {
-    width: 100%;
-}
-
-body.management .login-surface {
-    max-width: 28rem;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Modern :has() – management UI only (kept out of components.css for TV engines) */
-body.management .image-preview-tile:has(.image-preview-status) .image-preview-badge {
-    display: none;
-}
-
-body.management .form-check:has(input:checked) {
-    border-color: var(--color-primary);
-    background-color: #f1f5f9;
-}
-
-body.management .page-header .btn-link,
-body.management .surface > .btn-link,
-body.management .surface > div > .btn-link {
-    border: 1px solid var(--color-border);
-    background-color: var(--color-surface);
-}
-
-body.management .quick-actions-title {
-    margin-bottom: var(--spacing-md);
-}
-
-body.management .quick-actions-bar .btn-primary {
-    flex: 1 1 12rem;
-}
-
-body.management .section-anchor {
-    scroll-margin-top: var(--spacing-lg);
-}
-
-body.management .settings-accordion {
+.slide-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    margin-bottom: 0;
     padding: 0;
+    list-style: none;
 }
 
-body.management .settings-accordion-summary {
+.slide-row {
+    display: grid;
+    grid-template-columns: auto 5.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-2) var(--space-2) 0;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.slide-row.is-dragging {
+    position: relative;
+    z-index: 10;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-lg);
+    transform: scale(1.02);
+}
+
+.slide-list.is-sorting {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.drag-handle {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    min-height: var(--control-height);
+    padding: 0;
+    color: var(--text-muted);
+    opacity: 0.55;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: grab;
+    /* Dragging the handle must not scroll the page or open the iOS callout. */
+    touch-action: none;
+    -webkit-touch-callout: none;
+}
+
+.drag-handle:hover,
+.slide-row.is-dragging .drag-handle {
+    color: var(--accent);
+    opacity: 1;
+}
+
+.slide-row.is-dragging .drag-handle {
+    cursor: grabbing;
+}
+
+.drag-handle:disabled {
+    visibility: hidden;
+}
+
+.slide-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background-color: var(--surface-sunken);
+    border-radius: var(--radius-sm);
+}
+
+.slide-thumb img,
+.content-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.slide-position {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    min-width: 1.25rem;
+    padding: 0 0.3125rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: #ffffff;
+    background-color: rgba(13, 17, 23, 0.72);
+    border-radius: var(--radius-pill);
+}
+
+.slide-text {
+    min-width: 0;
+}
+
+.slide-title,
+.slide-source {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slide-title {
+    font-weight: 600;
+}
+
+.slide-source {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.slide-status {
+    margin: 0;
+}
+
+.slide-locked {
+    display: grid;
+    place-items: center;
+    width: var(--control-height);
+    height: var(--control-height);
+    color: var(--border-strong);
+}
+
+.slide-row.is-disabled .slide-thumb img {
+    filter: grayscale(1);
+    opacity: 0.45;
+}
+
+.slide-row.is-disabled .slide-title {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* ---- Meine Inhalte / Zentrale Inhalte: cards ------------------------- */
+
+.bulk-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.bulk-bar form {
+    margin: 0;
+}
+
+/* The delete button only shows up once something is selected. */
+.bulk-bar [data-bulk-submit]:disabled {
+    visibility: hidden;
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+    gap: var(--space-3);
+}
+
+.content-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-    padding: var(--spacing-lg);
-    cursor: pointer;
-    list-style: none;
-    min-height: var(--touch-target);
+    min-width: 0;
+    overflow: hidden;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-body.management .settings-accordion-summary::-webkit-details-marker {
+.content-card:has(.bulk-checkbox:checked) {
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+
+.content-card-thumb {
+    aspect-ratio: 16 / 9;
+    background-color: var(--surface-sunken);
+}
+
+.content-card-select {
+    position: absolute;
+    top: var(--space-1);
+    left: var(--space-1);
+    display: grid;
+    place-items: center;
+    width: var(--control-height);
+    height: var(--control-height);
+    margin: 0;
+    cursor: pointer;
+}
+
+.content-card-select input {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+    border-radius: 0.25rem;
+}
+
+.content-card-body {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-3) 0;
+}
+
+.content-card-body:empty {
     display: none;
 }
 
-body.management .settings-accordion-summary h2 {
-    margin: 0;
-    font-size: 1.25rem;
-}
-
-body.management .settings-accordion-hint {
-    color: var(--color-text-muted);
-    font-size: 0.95rem;
-}
-
-body.management .settings-accordion-summary::after {
-    content: 'Öffnen';
-    color: var(--color-primary);
+.content-card-title {
+    display: -webkit-box;
+    overflow: hidden;
     font-weight: 600;
-    margin-top: var(--spacing-sm);
+    line-height: 1.3;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
-body.management .settings-accordion[open] > .settings-accordion-summary::after {
-    content: 'Schließen';
+.content-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
 }
 
-body.management .settings-accordion-body {
-    padding: 0 var(--spacing-lg) var(--spacing-lg);
-    border-top: 1px solid var(--color-border);
+.content-card-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: auto;
+    padding: var(--space-3);
 }
 
-body.management .settings-block {
-    padding-top: var(--spacing-lg);
+.content-card-actions > .btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--space-2);
 }
 
-body.management .settings-block h3 {
-    margin: 0 0 var(--spacing-md);
-    font-size: 1.05rem;
+.content-card-actions form {
+    margin: 0;
 }
 
-body.management .settings-block + .settings-block {
-    margin-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
+/* ---- Kitas ----------------------------------------------------------- */
+
+.user-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    margin-bottom: 0;
+    padding: 0;
+    list-style: none;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Narrow (≤819): stacked cards                                      */
-/*  Wide enough (≥820, iPad landscape+): compact horizontal item rows  */
-/* ------------------------------------------------------------------ */
-
-@media (max-width: 819px) {
-    body.management .data-header {
-        display: none;
-    }
-
-    body.management .data-row {
-        flex-direction: column;
-        align-items: stretch;
-        padding: var(--spacing-md) var(--spacing-lg);
-        gap: 0;
-    }
-
-    body.management .data-cell {
-        display: flex;
-        flex-direction: column;
-        padding: var(--spacing-sm) 0;
-        text-align: left;
-        align-items: flex-start;
-    }
-
-    body.management .data-cell + .data-cell {
-        border-top: 1px solid var(--color-border);
-    }
-
-    body.management .data-cell-label {
-        display: block;
-    }
-
-    body.management .cell-checkbox {
-        flex-direction: row;
-        align-items: center;
-        justify-content: flex-start;
-    }
-
-    body.management .cell-actions {
-        justify-content: flex-start;
-        gap: var(--spacing-sm);
-        min-width: 0;
-        width: 100%;
-    }
-
-    body.management .cell-actions .btn-link,
-    body.management .cell-actions button.btn-link {
-        flex: 1 1 auto;
-        border: 1px solid var(--color-border);
-        background-color: var(--color-bg);
-    }
-
-    body.management .cell-actions .form-inline {
-        display: flex;
-        flex: 1 1 auto;
-        margin: 0;
-    }
-
-    body.management .cell-actions .form-inline .btn-link {
-        width: 100%;
-    }
-
-    body.management .cell-actions button.btn-link.text-danger {
-        border-color: #fecaca;
-        background-color: #fef2f2;
-    }
-
-    body.management .flex-between {
-        align-items: stretch;
-    }
-
-    body.management .page-header {
-        align-items: flex-start;
-    }
-
-    body.management .actions-bar {
-        flex-direction: column;
-        align-items: stretch;
-        width: 100%;
-        margin-bottom: 0;
-    }
-
-    body.management .actions-bar > *,
-    body.management .actions-bar .btn,
-    body.management .actions-bar form,
-    body.management .actions-bar form button {
-        width: 100%;
-    }
+.user-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
 }
 
-/* Compact side-by-side fields within each slider/content item */
-@media (min-width: 820px) {
-    body.management .section-header {
-        align-items: center;
+.user-row-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-row-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-row-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.user-row-actions form {
+    margin: 0;
+}
+
+.pin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.pin-chip .icon {
+    width: 1em;
+    height: 1em;
+}
+
+.pin-chip-missing {
+    color: var(--warning);
+}
+
+.pin-reachability-code {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text);
+}
+
+/* ---- Edit pages ------------------------------------------------------ */
+
+.current-image {
+    margin: 0;
+}
+
+.current-image img {
+    max-height: 16rem;
+    border-radius: var(--radius);
+}
+
+.current-image figcaption {
+    margin-top: var(--space-1);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 35rem) {
+    .slide-row {
+        grid-template-columns: auto 4.5rem minmax(0, 1fr) auto;
+        gap: var(--space-2);
     }
 
-    body.management .actions-bar {
-        flex-direction: row;
+    .content-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .user-row {
         flex-wrap: wrap;
-        align-items: center;
-        width: auto;
-        margin-bottom: 0;
     }
 
-    body.management .actions-bar > *,
-    body.management .actions-bar .btn,
-    body.management .actions-bar form,
-    body.management .actions-bar form button {
-        width: auto;
-    }
-
-    body.management .data-list-content,
-    body.management .data-list-slider {
-        display: flex;
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-
-    body.management .data-header {
-        display: flex;
-        font-weight: 600;
-        background-color: var(--color-bg);
-        border: 1px solid transparent;
-        border-bottom: 2px solid var(--color-border);
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-
-    body.management .data-row {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        align-items: center;
-        padding: var(--spacing-sm) var(--spacing-md);
-        gap: var(--spacing-sm);
-    }
-
-    body.management .data-cell {
-        display: block;
-        padding: 0;
-        min-width: 0;
-    }
-
-    body.management .data-cell + .data-cell {
-        border-top: none;
-    }
-
-    body.management .data-cell-label {
-        display: none;
-    }
-
-    body.management .cell-order {
-        flex: 0 0 6.5rem;
-        max-width: 6.5rem;
-    }
-
-    body.management .cell-checkbox-col {
-        flex: 0 0 auto;
-    }
-
-    body.management .cell-checkbox {
-        justify-content: center;
-    }
-
-    body.management .cell-actions {
+    .user-row-actions {
+        flex-basis: 100%;
         justify-content: flex-end;
-        flex: 0 1 auto;
-        min-width: 10rem;
-        width: auto;
-    }
-
-    body.management .cell-actions .btn-link,
-    body.management .cell-actions button.btn-link {
-        flex: 0 1 auto;
-    }
-
-    body.management .cell-actions .form-inline {
-        display: inline-flex;
-        flex: 0 0 auto;
-        margin: 0;
-    }
-
-    body.management .cell-actions .form-inline .btn-link {
-        width: auto;
-    }
-
-    body.management .thumbnail {
-        max-width: 3.25rem;
-        max-height: 3.25rem;
-    }
-
-    body.management .status-toggle-hint {
-        display: none;
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Desktop (≥1280): slightly denser controls for mouse / keyboard     */
-/* ------------------------------------------------------------------ */
-
-@media (min-width: 1280px) {
-    body.management .data-row:not(.data-header):hover {
-        background-color: var(--color-bg);
-    }
-
-    body.management .cell-actions {
-        min-width: 14rem;
-    }
-
-    body.management .cell-order {
-        flex: 0 0 7rem;
-        max-width: 7rem;
-    }
-
-    /* Slightly tighter controls – desktop doesn't need 44px everywhere */
-    body.management .btn,
-    body.management button:not(.wysiwyg-btn):not(.btn-icon):not(.status-toggle):not(.image-preview-remove) {
-        min-height: 2.25rem;
-        padding: 0.45rem 1rem;
-    }
-
-    body.management .btn-link,
-    body.management button.btn-link,
-    body.management a.btn-link {
-        min-height: 2.25rem;
-        min-width: auto;
-        padding: 0.35rem 0.65rem;
-    }
-
-    body.management .btn-icon {
-        min-width: 2.25rem;
-        min-height: 2.25rem;
-    }
-
-    body.management input[type="text"],
-    body.management input[type="password"],
-    body.management input[type="number"],
-    body.management textarea,
-    body.management select,
-    body.management input[type="file"] {
-        min-height: 2.25rem;
-        padding: 0.4rem 0.75rem;
-    }
-
-    body.management .container {
-        max-width: 72rem;
-    }
-}
-
-/* Prefer active feedback over hover-only cues on touch */
-@media (hover: none) {
-    body.management .btn-primary:active,
-    body.management button[type="submit"]:not(.btn-link):not(.btn-icon):not(.wysiwyg-btn):not(.status-toggle):active {
-        background-color: var(--color-primary-hover);
-    }
-
-    body.management .data-row:not(.data-header):active {
-        background-color: var(--color-bg);
     }
 }

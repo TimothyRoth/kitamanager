@@ -1,19 +1,17 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block body_class %}management{% endblock %}
 
 {% block body %}
-    <div class="container">
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endfor %}
+    {{ include('management/_header.html.twig') }}
 
-        <div class="surface">
+    <main class="page page-narrow">
+        <a href="{{ path('app_management_user') }}" class="back-link">{{ icons.icon('back') }} Zurück zum Dashboard</a>
+        {{ include('management/_flashes.html.twig') }}
+
+        <section class="panel">
             <h1>{{ page_title }}</h1>
 
             {# The bulk image form uploads via a sequential AJAX loop (one
@@ -25,18 +23,11 @@
                 'data-upload-token': csrf_token('upload-image'),
                 'data-upload-success-url': path('app_management_user') ~ '#mein-slider'
             }}) }}
-            <div class="form-group">
-                {{ form_widget(form) }}
-            </div>
-            <button type="submit" class="btn btn-primary">
+            {{ form_widget(form) }}
+            <button type="submit" class="btn btn-primary btn-large">
                 {{ attribute(form.imageFile.vars.attr, 'multiple') is defined ? 'Fotos hochladen' : 'Speichern' }}
             </button>
             {{ form_end(form) }}
-
-            <div style="margin-top: var(--spacing-md);">
-                <a href="{{ path(app.user ? 'app_management_user' : 'app_management_admin') }}" class="btn btn-link">Zurück
-                    zum Dashboard</a>
-            </div>
-        </div>
-    </div>
+        </section>
+    </main>
 {% endblock %}

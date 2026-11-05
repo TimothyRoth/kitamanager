@@ -1,255 +1,153 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}Benutzer-Dashboard{% endblock %}
 {% block body_class %}management{% endblock %}
 
 {% block body %}
-    <div class="container">
-        <div class="flex-between page-header">
-            <h1>Willkommen, {{ app.user.username }}!</h1>
-            <a href="{{ logout_path() }}" class="btn btn-link">Abmelden</a>
-        </div>
+    {{ include('management/_header.html.twig', {settings_anchor: true}) }}
 
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endfor %}
+    <main class="page">
+        {{ include('management/_flashes.html.twig') }}
 
         {# Set by the AJAX bulk upload, which redirects here after the last
            image instead of using a session flash. #}
         {% set uploadedCount = app.request.query.getInt('uploaded') %}
         {% if uploadedCount > 0 %}
-            <div class="alert alert-success">
+            <div class="alert alert-success" role="status">
                 {{ uploadedCount }} Bild(er) erfolgreich hochgeladen!
-                Prüfen Sie unten die Reihenfolge in „Mein Slider“.
+                Prüfen Sie die Reihenfolge in „Mein Slider“.
                 Änderungen erscheinen auf dem Fernseher in Kürze.
             </div>
         {% endif %}
 
-        {# ---------------------------------------------------------------- #}
-        {#  Einstellungen (selten) – zugeklappt, über Schnellaktionen       #}
-        {# ---------------------------------------------------------------- #}
-        {% set settingsOpen = not durationForm.vars.valid or not passwordForm.vars.valid %}
-        <details class="settings-accordion surface" style="margin-top: var(--spacing-xl);"{% if settingsOpen %} open{% endif %}>
-            <summary class="settings-accordion-summary">
-                <h2>Einstellungen &amp; Sicherheit</h2>
-                <span class="settings-accordion-hint">Slide-Dauer und Passwort</span>
-            </summary>
-            <div class="settings-accordion-body">
-                <div class="settings-block">
-                    <h3>Dauer zwischen den Slides</h3>
-                    {{ form_start(durationForm) }}
-                    <div class="form-group">
-                        {{ form_row(durationForm.durationBetweenSlides) }}
+        <section class="hero">
+            <h1>Willkommen, {{ app.user.username }}!</h1>
+            <nav class="quick-actions" aria-label="Schnellaktionen">
+                <a href="{{ path('app_management_create_image') }}" class="quick-action quick-action-primary">
+                    {{ icons.icon('camera') }}
+                    <span><strong>Fotos hinzufügen</strong><small>Aufnehmen oder auswählen</small></span>
+                </a>
+                <a href="{{ path('app_management_create_article') }}" class="quick-action">
+                    {{ icons.icon('document') }}
+                    <span><strong>Artikel schreiben</strong><small>Text mit Bild</small></span>
+                </a>
+                <a href="{{ path('app_slider') }}" class="quick-action">
+                    {{ icons.icon('eye') }}
+                    <span><strong>Vorschau</strong><small>So sieht es der Fernseher</small></span>
+                </a>
+            </nav>
+        </section>
+
+        <div class="dashboard dashboard-slider">
+            <section class="panel" id="mein-slider">
+                <header class="panel-header">
+                    <span class="panel-icon">{{ icons.icon('tv') }}</span>
+                    <div class="panel-heading">
+                        <h2>Mein Slider</h2>
+                        <p>Das zeigt Ihr Fernseher – in dieser Reihenfolge.</p>
                     </div>
+                    <span class="count-chip">{{ sliderItems|length }}</span>
+                </header>
+
+                {% if sliderItems is empty %}
+                    <p class="empty-state">Ihr Slider enthält noch keine Inhalte.</p>
+                {% else %}
+                    <ol class="slide-list" data-sortable-list
+                        data-reorder-url="{{ path('app_management_slider_reorder') }}"
+                        data-reorder-token="{{ csrf_token('reorder-slider') }}">
+                        {% for item in sliderItems %}
+                            {% set content = item.content %}
+                            {% set isOwnContent = content.creator and content.creator.id == app.user.id %}
+                            {% set isArticle = content.type.value == 'article' %}
+                            <li class="slide-row{{ isOwnContent and not item.isEnabled ? ' is-disabled' }}"
+                                id="slider-item-{{ item.id }}" data-item-id="{{ item.id }}">
+                                <button type="button" class="drag-handle" data-drag-handle
+                                        aria-label="Reihenfolge ändern: ziehen oder Pfeiltasten hoch/runter"
+                                        title="Ziehen, um die Reihenfolge zu ändern"{{ sliderItems|length < 2 ? ' disabled' }}>
+                                    {{ icons.icon('grip') }}
+                                </button>
+                                <div class="slide-thumb">
+                                    {% if content.imageUrl %}
+                                        <img src="{{ asset(content.imageUrl) }}" alt="" loading="lazy">
+                                    {% endif %}
+                                    <span class="slide-position" data-slide-position>{{ loop.index }}</span>
+                                </div>
+                                <div class="slide-text">
+                                    <span class="slide-title">{{ isArticle ? content.title : 'Bild' }}</span>
+                                    <span class="slide-source">
+                                        {%- if isArticle %}Artikel · {% endif -%}
+                                        {%- if isOwnContent -%}
+                                            Eigener Inhalt
+                                        {%- else -%}
+                                            von {{ content.creator ? content.creator.username : 'unbekannt' }}
+                                        {%- endif -%}
+                                    </span>
+                                </div>
+                                {% if isOwnContent %}
+                                    <form method="post" class="slide-status"
+                                          action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
+                                          data-preserve-scroll>
+                                        <input type="hidden" name="_token" value="{{ csrf_token('toggle-status' ~ item.id) }}">
+                                        <button type="submit" class="switch{{ item.isEnabled ? ' is-on' }}" role="switch"
+                                                aria-checked="{{ item.isEnabled ? 'true' : 'false' }}"
+                                                aria-label="Auf dem Fernseher anzeigen"
+                                                title="{{ item.isEnabled ? 'Aktiv – tippen zum Ausblenden' : 'Ausgeblendet – tippen zum Anzeigen' }}">
+                                            <span class="switch-track"><span class="switch-thumb"></span></span>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="slide-status slide-locked" title="Zugewiesene Inhalte können nicht deaktiviert werden">
+                                        {{ icons.icon('lock') }}<span class="sr-only">Zugewiesen – nicht änderbar</span>
+                                    </span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ol>
+                    <p class="panel-footnote">
+                        {{ icons.icon('grip') }} ziehen zum Sortieren ·
+                        Schalter blendet eigene Inhalte aus ·
+                        {{ icons.icon('lock') }} von anderen zugewiesen
+                    </p>
+                {% endif %}
+            </section>
+
+            <section class="panel" id="meine-inhalte">
+                <header class="panel-header">
+                    <span class="panel-icon">{{ icons.icon('images') }}</span>
+                    <div class="panel-heading">
+                        <h2>Meine Inhalte</h2>
+                        <p>Von Ihnen erstellt – hier bearbeiten, löschen und sehen, wer es bekommt.</p>
+                    </div>
+                    <span class="count-chip">{{ contents|length }}</span>
+                </header>
+
+                {{ include('management/_contents.html.twig', {
+                    redirect_route: 'app_management_user',
+                    empty_text: 'Sie haben noch keine Inhalte erstellt.',
+                    creator_has_slider: true
+                }) }}
+            </section>
+        </div>
+
+        <section class="panel" id="einstellungen">
+            <header class="panel-header">
+                <span class="panel-icon">{{ icons.icon('settings') }}</span>
+                <div class="panel-heading">
+                    <h2>Einstellungen</h2>
+                    <p>Anzeigedauer und Passwort.</p>
+                </div>
+            </header>
+            <div class="settings-grid">
+                <div class="settings-block">
+                    <h3>Anzeigedauer</h3>
+                    {{ form_start(durationForm, {'attr': {'data-preserve-scroll': ''}}) }}
+                    {{ form_row(durationForm.durationBetweenSlides) }}
                     <button type="submit" class="btn btn-primary">Dauer speichern</button>
                     {{ form_end(durationForm) }}
                 </div>
-
                 {{ include('management/_password_form.html.twig') }}
             </div>
-        </details>
-
-        {# ---------------------------------------------------------------- #}
-        {#  Schnellaktionen – Kernjob ohne Scroll #}
-        {# ---------------------------------------------------------------- #}
-        <div class="surface quick-actions" style="margin-top: var(--spacing-xl);">
-            <h2 class="quick-actions-title">Schnellaktionen</h2>
-            <div class="actions-bar quick-actions-bar" style="margin-bottom: 0;">
-                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Fotos hinzufügen</a>
-                <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel hinzufügen</a>
-                <a href="{{ path('app_slider') }}" class="btn btn-secondary">Vorschau anzeigen</a>
-            </div>
-        </div>
-
-        {# ---------------------------------------------------------------- #}
-        {#  Mein Slider (was mir ausgespielt wird) #}
-        {# ---------------------------------------------------------------- #}
-        <div id="mein-slider" class="section-anchor">
-            <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
-                <div class="header-actions">
-                    <h2 style="margin-bottom: 0;">Mein Slider</h2>
-                    <a href="{{ path('app_slider') }}" class="btn btn-secondary">Vorschau</a>
-                </div>
-            </div>
-
-            <div class="data-list data-list-slider">
-                <div class="data-row data-header">
-                    {% if sliderItems|length > 1 %}
-                        <div class="data-cell cell-order">Reihenfolge</div>
-                    {% endif %}
-                    <div class="data-cell">Typ</div>
-                    <div class="data-cell" style="flex: 2;">Titel/Bild</div>
-                    <div class="data-cell">Quelle</div>
-                    <div class="data-cell">Status</div>
-                </div>
-
-                {% for item in sliderItems %}
-                    {% set content = item.content %}
-                    {% set isOwnContent = content.creator and content.creator.id == app.user.id %}
-                    <div class="data-row {{ isOwnContent and not item.isEnabled ? 'is-disabled' : '' }}" id="slider-item-{{ item.id }}">
-                        {% if sliderItems|length > 1 %}
-                            <div class="data-cell cell-order">
-                                <span class="data-cell-label">Reihenfolge</span>
-                                <div class="table-actions">
-                                    {% if not loop.first %}
-                                        <form class="form-inline" method="post"
-                                              action="{{ path('app_management_slider_move_up', {'id': item.id}) }}"
-                                              data-preserve-scroll>
-                                            <input type="hidden" name="_token"
-                                                   value="{{ csrf_token('move-up' ~ item.id) }}">
-                                            <button type="submit" class="btn-icon" title="Nach oben"
-                                                    aria-label="Nach oben">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z"/></svg>
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                    {% if not loop.last %}
-                                        <form class="form-inline" method="post"
-                                              action="{{ path('app_management_slider_move_down', {'id': item.id}) }}"
-                                              data-preserve-scroll>
-                                            <input type="hidden" name="_token"
-                                                   value="{{ csrf_token('move-down' ~ item.id) }}">
-                                            <button type="submit" class="btn-icon" title="Nach unten"
-                                                    aria-label="Nach unten">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20l8-8h-6v-8h-4v8h-6z"/></svg>
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endif %}
-                        <div class="data-cell">
-                            <span class="data-cell-label">Typ</span>
-                            {{ content.type.getGermanLabel() }}
-                        </div>
-                        <div class="data-cell" style="flex: 2;">
-                            <span class="data-cell-label">Titel/Bild</span>
-                            {% if content.type.value == 'article' %}
-                                {{ content.title }}
-                            {% else %}
-                                <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
-                            {% endif %}
-                        </div>
-                        <div class="data-cell">
-                            <span class="data-cell-label">Quelle</span>
-                            {% if content.creator and content.creator.id == app.user.id %}
-                                Eigener Inhalt
-                            {% else %}
-                                von {{ content.creator ? content.creator.username : 'unbekannt' }}
-                            {% endif %}
-                        </div>
-                        <div class="data-cell">
-                            <span class="data-cell-label">Status</span>
-                            {% if isOwnContent %}
-                                <form class="form-inline" method="post"
-                                      action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
-                                      data-preserve-scroll>
-                                    <input type="hidden" name="_token"
-                                           value="{{ csrf_token('toggle-status' ~ item.id) }}">
-                                    <button type="submit"
-                                            class="status-toggle {{ item.isEnabled ? 'status-toggle-active' : 'status-toggle-inactive' }}"
-                                            title="Tippen, um den Status zu ändern"
-                                            aria-label="{{ item.isEnabled ? 'Aktiv – tippen zum Deaktivieren' : 'Inaktiv – tippen zum Aktivieren' }}">
-                                        <span class="status-toggle-dot" aria-hidden="true"></span>
-                                        {{ item.isEnabled ? 'Aktiv' : 'Inaktiv' }}
-                                    </button>
-                                    <span class="status-toggle-hint">Zum Umschalten tippen</span>
-                                </form>
-                            {% else %}
-                                <span class="status-toggle status-toggle-active status-toggle-readonly"
-                                      title="Zugewiesene Inhalte können nicht deaktiviert werden"
-                                      aria-label="Aktiv – zugewiesener Inhalt">
-                                    <span class="status-toggle-dot" aria-hidden="true"></span>
-                                    Aktiv
-                                </span>
-                                <span class="status-toggle-hint">Zugewiesen – nicht änderbar</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="data-empty">Ihr Slider enthält noch keine Inhalte.</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        {# ---------------------------------------------------------------- #}
-        {#  Meine Inhalte (selbst erstellt) #}
-        {# ---------------------------------------------------------------- #}
-        <div id="meine-inhalte" class="section-anchor">
-            <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
-                <h2 style="margin-bottom: 0;">Meine Inhalte</h2>
-                <div class="actions-bar" style="margin-bottom: 0;">
-                    <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Fotos hinzufügen</a>
-                    <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel hinzufügen</a>
-                    <form id="bulkDeleteForm" method="post"
-                          action="{{ path('app_management_bulk_delete_content') }}"
-                          data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt.">
-                        <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
-                        <input type="hidden" name="_redirect" value="app_management_user">
-                        <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="data-list data-list-content">
-                <div class="data-row data-header">
-                    <div class="data-cell cell-checkbox cell-checkbox-col">
-                        <input type="checkbox" data-bulk-select-all title="Alle auswählen">
-                    </div>
-                    <div class="data-cell">Typ</div>
-                    <div class="data-cell" style="flex: 2;">Titel/Bild</div>
-                    <div class="data-cell">Zielgruppe</div>
-                    <div class="data-cell cell-actions">Aktionen</div>
-                </div>
-
-                {% for content in contents %}
-                    <div class="data-row">
-                        <div class="data-cell cell-checkbox cell-checkbox-col">
-                            <span class="data-cell-label">Auswählen</span>
-                            <input type="checkbox" class="bulk-checkbox" name="ids[]"
-                                   value="{{ content.id }}" form="bulkDeleteForm">
-                        </div>
-                        <div class="data-cell">
-                            <span class="data-cell-label">Typ</span>
-                            {{ content.type.getGermanLabel() }}
-                        </div>
-                        <div class="data-cell" style="flex: 2;">
-                            <span class="data-cell-label">Titel/Bild</span>
-                            {% if content.type.value == 'article' %}
-                                {{ content.title }}
-                            {% else %}
-                                <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
-                            {% endif %}
-                        </div>
-                        <div class="data-cell">
-                            <span class="data-cell-label">Zielgruppe</span>
-                            {% if content.audienceAll %}
-                                Alle zugewiesenen
-                            {% elseif content.sliderItems|length > 1 %}
-                                {{ content.sliderItems|length - 1 }} weitere
-                            {% else %}
-                                Nur ich
-                            {% endif %}
-                        </div>
-                        <div class="data-cell cell-actions">
-                            <a href="{{ path('app_management_edit_content', {'id': content.id}) }}"
-                               class="btn btn-link">Bearbeiten</a>
-                            <form class="form-inline" method="post"
-                                  action="{{ path('app_management_delete_content', {'id': content.id}) }}"
-                                  data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt.">
-                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
-                                <button type="submit" class="btn-link text-danger">Löschen</button>
-                            </form>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="data-empty">Sie haben noch keine Inhalte erstellt.</div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+        </section>
+    </main>
 {% endblock %}

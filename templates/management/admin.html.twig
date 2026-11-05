@@ -1,163 +1,117 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}Admin Dashboard{% endblock %}
 {% block body_class %}management{% endblock %}
 
 {% block body %}
-    <div class="container">
-        <div class="flex-between page-header">
+    {{ include('management/_header.html.twig', {settings_anchor: true}) }}
+
+    <main class="page">
+        {{ include('management/_flashes.html.twig') }}
+
+        <section class="hero">
             <h1>Willkommen, {{ app.user.username }}!</h1>
-            <a href="{{ logout_path() }}" class="btn btn-link">Abmelden</a>
+            <nav class="quick-actions" aria-label="Schnellaktionen">
+                <a href="{{ path('app_management_create_image') }}" class="quick-action quick-action-primary">
+                    {{ icons.icon('camera') }}
+                    <span><strong>Bilder hinzufügen</strong><small>Für alle oder ausgewählte Kitas</small></span>
+                </a>
+                <a href="{{ path('app_management_create_article') }}" class="quick-action">
+                    {{ icons.icon('document') }}
+                    <span><strong>Artikel schreiben</strong><small>Text mit Bild</small></span>
+                </a>
+            </nav>
+        </section>
+
+        <div class="dashboard dashboard-even">
+            <section class="panel" id="kitas">
+                <header class="panel-header">
+                    <span class="panel-icon">{{ icons.icon('users') }}</span>
+                    <div class="panel-heading">
+                        <h2>Kitas</h2>
+                        <p>Konten, Fernseher-PINs und wer an wen ausspielen darf.</p>
+                    </div>
+                    <span class="count-chip">{{ users|length }}</span>
+                </header>
+
+                <details class="disclosure"{{ form.vars.submitted and not form.vars.valid ? ' open' }}>
+                    <summary>{{ icons.icon('plus') }} Neuen Benutzer anlegen</summary>
+                    <div class="disclosure-body">
+                        {{ form_start(form) }}
+                        {{ form_row(form.username, {'label': 'Benutzername'}) }}
+                        {{ form_row(form.plainPassword, {'label': 'Passwort'}) }}
+                        {{ form_row(form.publishToAll) }}
+                        <div data-publish-targets>
+                            {{ form_row(form.publishTargets) }}
+                        </div>
+                        <button type="submit" class="btn btn-primary">Benutzer hinzufügen</button>
+                        {{ form_end(form) }}
+                    </div>
+                </details>
+
+                {% if users is empty %}
+                    <p class="empty-state">Keine Benutzer gefunden.</p>
+                {% else %}
+                    <ul class="user-list">
+                        {% for user in users %}
+                            <li class="user-row">
+                                <span class="avatar" aria-hidden="true">{{ user.username|split(' ', 2)|last|first|upper }}</span>
+                                <div class="user-row-text">
+                                    <span class="user-row-name">{{ user.username }}</span>
+                                    {% if user.devicePin %}
+                                        <span class="pin-chip" title="Slider über diese PIN erreichbar">
+                                            {{ icons.icon('tv') }} PIN <span class="pin-reachability-code">{{ user.devicePin }}</span>
+                                        </span>
+                                    {% else %}
+                                        <span class="pin-chip pin-chip-missing">{{ icons.icon('tv') }} nicht erreichbar</span>
+                                    {% endif %}
+                                </div>
+                                <div class="user-row-actions">
+                                    <a href="{{ path('app_slider', {'slug': user.slug}) }}" class="btn btn-ghost btn-square"
+                                       aria-label="Slider von {{ user.username }} ansehen" title="Slider ansehen">{{ icons.icon('eye') }}</a>
+                                    <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-secondary">Bearbeiten</a>
+                                    <form method="post" action="{{ path('app_management_delete_user', {'id': user.id}) }}"
+                                          data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
+                                        <button type="submit" class="btn btn-danger-quiet" aria-label="{{ user.username }} löschen" title="Löschen">{{ icons.icon('trash') }}</button>
+                                    </form>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </section>
+
+            <section class="panel" id="zentrale-inhalte">
+                <header class="panel-header">
+                    <span class="panel-icon">{{ icons.icon('images') }}</span>
+                    <div class="panel-heading">
+                        <h2>Zentrale Inhalte</h2>
+                        <p>Von Ihnen erstellt und an Kitas ausgespielt. Die Zielgruppe legen Sie beim Bearbeiten fest.</p>
+                    </div>
+                    <span class="count-chip">{{ contents|length }}</span>
+                </header>
+
+                {{ include('management/_contents.html.twig', {
+                    redirect_route: 'app_management_admin',
+                    empty_text: 'Keine zentralen Inhalte gefunden.',
+                    creator_has_slider: false
+                }) }}
+            </section>
         </div>
 
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }}">
-                    {{ message }}
+        <section class="panel" id="einstellungen">
+            <header class="panel-header">
+                <span class="panel-icon">{{ icons.icon('settings') }}</span>
+                <div class="panel-heading">
+                    <h2>Einstellungen</h2>
+                    <p>Ihr Passwort.</p>
                 </div>
-            {% endfor %}
-        {% endfor %}
-
-        <details class="settings-accordion surface" style="margin-top: var(--spacing-xl);"{% if not passwordForm.vars.valid %} open{% endif %}>
-            <summary class="settings-accordion-summary">
-                <h2>Einstellungen &amp; Sicherheit</h2>
-                <span class="settings-accordion-hint">Passwort</span>
-            </summary>
-            <div class="settings-accordion-body">
+            </header>
+            <div class="settings-grid">
                 {{ include('management/_password_form.html.twig') }}
             </div>
-        </details>
-
-        <div class="surface" style="margin-top: var(--spacing-xl);">
-            <h2>Benutzer verwalten</h2>
-            <h3>Neuen Benutzer hinzufügen</h3>
-            {{ form_start(form) }}
-            <div class="form-group">
-                {{ form_row(form.username, {'label': 'Benutzername'}) }}
-            </div>
-            <div class="form-group">
-                {{ form_row(form.plainPassword, {'label': 'Passwort'}) }}
-            </div>
-            <div class="form-group">
-                {{ form_row(form.publishToAll) }}
-            </div>
-            <div class="form-group" data-publish-targets>
-                {{ form_row(form.publishTargets) }}
-            </div>
-            <button type="submit" class="btn btn-primary">Benutzer hinzufügen</button>
-            {{ form_end(form) }}
-        </div>
-
-        <div class="data-list">
-            <div class="data-row data-header">
-                <div class="data-cell">Name</div>
-                <div class="data-cell">Fernseher-PIN</div>
-                <div class="data-cell cell-actions">Aktionen</div>
-            </div>
-
-            {% for user in users %}
-                <div class="data-row">
-                    <div class="data-cell">
-                        <span class="data-cell-label">Name</span>
-                        <a href="{{ path('app_slider', {'slug': user.slug}) }}">{{ user.username }}</a>
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Fernseher-PIN</span>
-                        {% if user.devicePin %}
-                            <span class="pin-reachability-code" title="Slider über diese PIN erreichbar">{{ user.devicePin }}</span>
-                        {% else %}
-                            <span class="text-muted">nicht erreichbar</span>
-                        {% endif %}
-                    </div>
-                    <div class="data-cell cell-actions">
-                        <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-link">Bearbeiten</a>
-                        <form class="form-inline" method="post"
-                              action="{{ path('app_management_delete_user', {'id': user.id}) }}"
-                              data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
-                            <button type="submit" class="btn-link text-danger">Löschen</button>
-                        </form>
-                    </div>
-                </div>
-            {% else %}
-                <div class="data-empty">Keine Benutzer gefunden.</div>
-            {% endfor %}
-        </div>
-
-        <div class="flex-between section-header" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">
-            <h2>Zentrale Inhalte verwalten</h2>
-            <div class="actions-bar" style="margin-bottom: 0;">
-                <a href="{{ path('app_management_create_image') }}" class="btn btn-primary">Bilder
-                    hinzufügen</a>
-                <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel
-                    hinzufügen</a>
-                <form id="bulkDeleteForm" method="post"
-                      action="{{ path('app_management_bulk_delete_content') }}"
-                      data-confirm="Ausgewählte Inhalte wirklich löschen?">
-                    <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
-                    <input type="hidden" name="_redirect" value="app_management_admin">
-                    <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
-                </form>
-            </div>
-        </div>
-
-        <p class="text-muted" style="margin-bottom: var(--spacing-md);">
-            Diese Inhalte erstellst du als Administrator und spielst sie gezielt an zugewiesene Benutzer
-            (oder an alle) aus. Die Zielgruppe legst du beim Bearbeiten des jeweiligen Inhalts fest.
-        </p>
-
-        <div class="data-list">
-            <div class="data-row data-header">
-                <div class="data-cell cell-checkbox cell-checkbox-col">
-                    <input type="checkbox" data-bulk-select-all title="Alle auswählen">
-                </div>
-                <div class="data-cell">Typ</div>
-                <div class="data-cell" style="flex: 2;">Titel/Bild</div>
-                <div class="data-cell">Zielgruppe</div>
-                <div class="data-cell cell-actions">Aktionen</div>
-            </div>
-
-            {% for content in contents %}
-                <div class="data-row">
-                    <div class="data-cell cell-checkbox cell-checkbox-col">
-                        <span class="data-cell-label">Auswählen</span>
-                        <input type="checkbox" class="bulk-checkbox" name="ids[]"
-                               value="{{ content.id }}" form="bulkDeleteForm">
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Typ</span>
-                        {{ content.type.getGermanLabel() }}
-                    </div>
-                    <div class="data-cell" style="flex: 2;">
-                        <span class="data-cell-label">Titel/Bild</span>
-                        {% if content.type.value == 'article' %}
-                            {{ content.title }}
-                        {% else %}
-                            <img src="{{ asset(content.imageUrl) }}" alt="Vorschau" class="thumbnail">
-                        {% endif %}
-                    </div>
-                    <div class="data-cell">
-                        <span class="data-cell-label">Zielgruppe</span>
-                        {% if content.audienceAll %}
-                            Alle Kitas
-                        {% else %}
-                            {{ content.sliderItems|length }} Kitas
-                        {% endif %}
-                    </div>
-                    <div class="data-cell cell-actions">
-                        <a href="{{ path('app_management_edit_content', {'id': content.id}) }}"
-                           class="btn btn-link">Bearbeiten</a>
-                        <form class="form-inline" method="post"
-                              action="{{ path('app_management_delete_content', {'id': content.id}) }}"
-                              data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Benutzern entfernt.">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
-                            <button type="submit" class="btn-link text-danger">Löschen</button>
-                        </form>
-                    </div>
-                </div>
-            {% else %}
-                <div class="data-empty">Keine zentralen Inhalte gefunden.</div>
-            {% endfor %}
-        </div>
-    </div>
+        </section>
+    </main>
 {% endblock %}

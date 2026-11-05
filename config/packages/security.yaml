@@ -27,6 +27,9 @@ security:
             logout:
                 path: app_logout
                 target: app_login
+            remember_me:
+                secret: '%kernel.secret%'
+                lifetime: 2592000 # 30 days, only when "Angemeldet bleiben" is ticked
 
             # Activate different ways to authenticate:
             # https://symfony.com/doc/current/security.html#the-firewall

@@ -1,52 +1,59 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}Anmelden{% endblock %}
-{% block body_class %}management{% endblock %}
+{% block body_class %}management login-page{% endblock %}
 
 {# Login must work on constrained browsers (e.g. Smart-TV browsers used for
-   kiosk checks): no ES6 script.js. The form is a plain HTML POST and does
-   not need client-side JS. #}
-{% block app_javascripts %}{% endblock %}
+   kiosk checks): no ES6 script.js. The form is a plain HTML POST and works
+   without JS; the ES5 password toggle is an optional extra. #}
+{% block app_javascripts %}
+    <script src="{{ asset('js/password-toggle.js') }}" defer></script>
+{% endblock %}
 
 {% block body %}
-    <div class="container">
-        <div class="surface login-surface">
-            <form method="post">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-                {% endif %}
-
-                {% if app.user %}
-                    <div class="alert alert-success">
-                        Sie sind angemeldet als {{ app.user.userIdentifier }}, <a
-                            href="{{ logout_path() }}" class="btn-link">Abmelden</a>
-                    </div>
-                {% else %}
-
-                    <h1>Bitte melden Sie sich an</h1>
-
-                    <div class="form-group">
-                        <label for="username">Benutzername</label>
-                        <input type="text" value="{{ last_username }}" name="_username" id="username"
-                               autocomplete="username" required autofocus
-                               autocapitalize="none" autocorrect="off" spellcheck="false">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="password">Passwort</label>
-                        <input type="password" name="_password" id="password" autocomplete="current-password"
-                               required>
-                    </div>
-
-                    <input type="hidden" name="_csrf_token"
-                           value="{{ csrf_token('authenticate') }}">
-
-                    <button class="btn btn-primary btn-block" type="submit">
-                        Anmelden
-                    </button>
-
-                {% endif %}
-            </form>
+    <main class="login">
+        <div class="login-brand">
+            <span class="app-bar-logo">{{ icons.icon('tv') }}</span>
+            Kita-Manager
         </div>
-    </div>
+
+        <form method="post" class="panel login-panel">
+            {% if error %}
+                <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+            {% endif %}
+
+            {% if app.user %}
+                <div class="alert alert-success">
+                    Sie sind angemeldet als {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">Abmelden</a>
+                </div>
+            {% else %}
+                <h1>Anmelden</h1>
+
+                <div class="form-row">
+                    <label for="username">Benutzername</label>
+                    <input type="text" value="{{ last_username }}" name="_username" id="username"
+                           autocomplete="username" required autofocus
+                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                </div>
+
+                <div class="form-row">
+                    <label for="password">Passwort</label>
+                    <div class="password-field">
+                        <input type="password" name="_password" id="password" autocomplete="current-password" required>
+                        {{- include('form/_password_toggle.html.twig') -}}
+                    </div>
+                </div>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" name="_remember_me">
+                    <span>Angemeldet bleiben</span>
+                </label>
+
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+                <button class="btn btn-primary btn-large btn-block" type="submit">Anmelden</button>
+            {% endif %}
+        </form>
+    </main>
 {% endblock %}
