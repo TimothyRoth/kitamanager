@@ -112,6 +112,33 @@ final class AuthorizationFlowTest extends AppWebTestCase
         ]);
     }
 
+    private function submitNewKitaForm(string $username): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $this->client->submit($crawler->selectButton('Benutzer hinzufügen')->form([
+            'user[username]' => $username,
+            'user[plainPassword]' => 'neu-secret',
+        ]));
+    }
+
+    private function deleteKitaAsAdmin(User $kita): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $form = $crawler->filter(sprintf('form[action$="/management/admin/delete-user/%d"]', $kita->getId()))->form();
+        $this->client->submit($form);
+        self::assertResponseRedirects('/management/admin');
+    }
+
+    private function publishAssignmentCount(int $userId): int
+    {
+        return (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM user_publish_target WHERE source_user_id = :id OR target_user_id = :id',
+            ['id' => $userId]
+        );
+    }
+
     private function loginForm(string $username, string $password): void
     {
         $crawler = $this->client->request('GET', '/admin');
@@ -274,16 +301,83 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $itemId = $this->sliderItemFor($content, $this->kitaC)?->getId();
         self::assertNotNull($itemId);
 
-        $this->client->loginUser($this->admin);
-        $crawler = $this->client->request('GET', '/management/admin');
-        $form = $crawler->filter(sprintf('form[action$="/management/admin/delete-user/%d"]', $this->kitaC->getId()))->form();
-        $this->client->submit($form);
-        self::assertResponseRedirects('/management/admin');
+        $this->deleteKitaAsAdmin($this->kitaC);
 
         $this->em->clear();
         self::assertNull($this->em->getRepository(User::class)->find($this->kitaC->getId()));
         self::assertNull($this->em->getRepository(Content::class)->find($content->getId()));
         self::assertNull($this->em->getRepository(SliderItem::class)->find($itemId));
+    }
+
+    public function testDeletingKitaRemovesItsPublishAssignments(): void
+    {
+        $kitaBId = $this->kitaB->getId();
+        $this->kitaB->addPublishTarget($this->kitaC);
+        $this->em->flush();
+        self::assertSame(2, $this->publishAssignmentCount($kitaBId), 'kita-b is a target of kita-a and publishes to kita-c');
+
+        $this->deleteKitaAsAdmin($this->kitaB);
+
+        self::assertSame(0, $this->publishAssignmentCount($kitaBId));
+    }
+
+    public function testUsernameIsRequiredAndMustNotContainASlash(): void
+    {
+        $this->submitNewKitaForm('Kita/Nord');
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'Schrägstrich');
+
+        $this->submitNewKitaForm('   ');
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'Bitte geben Sie einen Benutzernamen ein.');
+
+        self::assertCount(4, $this->em->getRepository(User::class)->findAll());
+    }
+
+    public function testUsernameWithTheSameSliderAddressIsRejected(): void
+    {
+        $this->submitNewKitaForm('Kita A');
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'sehr ähnlichen Namen');
+    }
+
+    public function testAdminCanChangeOwnPassword(): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $this->client->submit($crawler->selectButton('Passwort speichern')->form([
+            'change_password[currentPassword]' => 'admin-secret',
+            'change_password[newPassword]' => 'new-admin-secret',
+        ]));
+        self::assertResponseRedirects('/management/admin');
+
+        $this->client->restart();
+        $this->loginForm('admin', 'new-admin-secret');
+        self::assertResponseRedirects('/management/admin');
+    }
+
+    public function testAdminPasswordChangeNeedsTheCurrentPassword(): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $this->client->submit($crawler->selectButton('Passwort speichern')->form([
+            'change_password[currentPassword]' => 'wrong-password',
+            'change_password[newPassword]' => 'new-admin-secret',
+        ]));
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'Das aktuelle Passwort ist nicht korrekt.');
+    }
+
+    public function testAdminAccountsCannotBeDeleted(): void
+    {
+        $this->client->loginUser($this->admin);
+        $this->client->request('POST', '/management/admin/delete-user/' . $this->admin->getId(), ['_token' => 'irrelevant']);
+
+        self::assertResponseStatusCodeSame(403);
+        $this->em->clear();
+        self::assertNotNull($this->em->getRepository(User::class)->find($this->admin->getId()));
     }
 
     // --- Inhalte & Zuweisung -----------------------------------------------
@@ -561,5 +655,49 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
         self::assertNotSame($before['signature'], $after['signature']);
         self::assertStringContainsString('Frisch auf dem TV', $after['html']);
+    }
+
+    public function testRenamedKitaKeepsFeedingItsLinkedTv(): void
+    {
+        $this->createArticle($this->kitaA, 'Vor der Umbenennung');
+        $this->kitaA->setUsername('Kita Regenbogen');
+        $this->em->flush();
+
+        $this->client->request('GET', '/slider/kita-a/content', [], [], ['HTTP_X_DISPLAY_PIN' => '1111']);
+
+        self::assertResponseIsSuccessful();
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertStringContainsString('Vor der Umbenennung', $body['html'] ?? '');
+    }
+
+    public function testDeletedKitaSendsItsLinkedTvBackToPinEntry(): void
+    {
+        $this->em->remove($this->kitaA);
+        $this->em->flush();
+
+        $this->client->request('GET', '/slider/kita-a/content', [], [], ['HTTP_X_DISPLAY_PIN' => '1111']);
+
+        self::assertResponseIsSuccessful();
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertTrue($body['unlinked'] ?? false);
+    }
+
+    public function testUnknownSliderWithoutPinIsNotFound(): void
+    {
+        $this->client->request('GET', '/slider/gibt-es-nicht/content');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testLoggedInPreviewIsNotBoundToAPinEnteredEarlier(): void
+    {
+        $this->client->request('POST', '/slider/display', ['pin' => '1111']);
+        $this->client->loginUser($this->admin);
+
+        $this->client->request('GET', '/slider/kita-b/content');
+
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('html', $body);
+        self::assertArrayNotHasKey('unlinked', $body);
     }
 }

@@ -9,6 +9,8 @@ use Symfony\Component\String\Slugger\SluggerInterface;
 
 class ImageUploader
 {
+    private const PUBLIC_PREFIX = '/uploads';
+
     private string $targetDirectory;
     private SluggerInterface $slugger;
     private Filesystem $filesystem;
@@ -20,15 +22,14 @@ class ImageUploader
         $this->filesystem = $filesystem;
     }
 
-    public function upload(UploadedFile $file, ?int $userId): string
+    public function upload(UploadedFile $file, int $userId): string
     {
         $originalFilename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $safeFilename = $this->slugger->slug($originalFilename);
         $extension = $file->guessExtension();
         $fileName = $safeFilename . '.' . $extension;
 
-        $subDirectory = $userId ? (string)$userId : 'global';
-        $uploadDirectory = $this->targetDirectory . '/' . $subDirectory;
+        $uploadDirectory = $this->targetDirectory . '/' . $userId;
 
         $counter = 1;
         while (file_exists($uploadDirectory . '/' . $fileName)) {
@@ -42,7 +43,7 @@ class ImageUploader
             throw new \RuntimeException('Could not move the uploaded file: ' . $e->getMessage(), 0, $e);
         }
 
-        return '/uploads/' . $subDirectory . '/' . $fileName;
+        return self::PUBLIC_PREFIX . '/' . $userId . '/' . $fileName;
     }
 
     public function delete(?string $filePath): void
@@ -51,7 +52,7 @@ class ImageUploader
             return;
         }
 
-        $fullPath = $this->targetDirectory . str_replace('/uploads', '', $filePath);
+        $fullPath = $this->targetDirectory . substr($filePath, strlen(self::PUBLIC_PREFIX));
 
         if ($this->filesystem->exists($fullPath)) {
             $this->filesystem->remove($fullPath);

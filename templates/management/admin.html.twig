@@ -18,10 +18,20 @@
             {% endfor %}
         {% endfor %}
 
+        <details class="settings-accordion surface" style="margin-top: var(--spacing-xl);"{% if not passwordForm.vars.valid %} open{% endif %}>
+            <summary class="settings-accordion-summary">
+                <h2>Einstellungen &amp; Sicherheit</h2>
+                <span class="settings-accordion-hint">Passwort</span>
+            </summary>
+            <div class="settings-accordion-body">
+                {{ include('management/_password_form.html.twig') }}
+            </div>
+        </details>
+
         <div class="surface" style="margin-top: var(--spacing-xl);">
             <h2>Benutzer verwalten</h2>
             <h3>Neuen Benutzer hinzufügen</h3>
-            {{ form_start(form, {'attr': {'data-turbo-scroll': 'false'}}) }}
+            {{ form_start(form) }}
             <div class="form-group">
                 {{ form_row(form.username, {'label': 'Benutzername'}) }}
             </div>
@@ -63,8 +73,7 @@
                         <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-link">Bearbeiten</a>
                         <form class="form-inline" method="post"
                               action="{{ path('app_management_delete_user', {'id': user.id}) }}"
-                              data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?"
-                              data-turbo-scroll="false">
+                              data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
                             <button type="submit" class="btn-link text-danger">Löschen</button>
                         </form>
@@ -84,8 +93,7 @@
                     hinzufügen</a>
                 <form id="bulkDeleteForm" method="post"
                       action="{{ path('app_management_bulk_delete_content') }}"
-                      data-confirm="Ausgewählte Inhalte wirklich löschen?"
-                      data-turbo-scroll="false">
+                      data-confirm="Ausgewählte Inhalte wirklich löschen?">
                     <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
                     <input type="hidden" name="_redirect" value="app_management_admin">
                     <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
@@ -141,8 +149,7 @@
                            class="btn btn-link">Bearbeiten</a>
                         <form class="form-inline" method="post"
                               action="{{ path('app_management_delete_content', {'id': content.id}) }}"
-                              data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Benutzern entfernt."
-                              data-turbo-scroll="false">
+                              data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Benutzern entfernt.">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
                             <button type="submit" class="btn-link text-danger">Löschen</button>
                         </form>

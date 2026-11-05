@@ -40,17 +40,6 @@ final class ImageUploaderTest extends TestCase
         self::assertFileExists($this->targetDir . '/42/Mein-Foto.jpg');
     }
 
-    public function testUploadUsesGlobalDirectoryWithoutUserId(): void
-    {
-        $path = $this->makeJpeg('anon.jpg');
-        $file = new UploadedFile($path, 'anon.jpg', 'image/jpeg', null, true);
-
-        $url = $this->uploader->upload($file, null);
-
-        self::assertSame('/uploads/global/anon.jpg', $url);
-        self::assertFileExists($this->targetDir . '/global/anon.jpg');
-    }
-
     public function testUploadRenamesOnCollision(): void
     {
         mkdir($this->targetDir . '/7');
@@ -77,6 +66,17 @@ final class ImageUploaderTest extends TestCase
 
         $this->uploader->delete(null);
         $this->uploader->delete('');
+    }
+
+    public function testDeleteRemovesFileWhoseNameStartsWithUploads(): void
+    {
+        $full = $this->targetDir . '/9/uploads-sommerfest.jpg';
+        mkdir(dirname($full), 0777, true);
+        file_put_contents($full, 'x');
+
+        $this->uploader->delete('/uploads/9/uploads-sommerfest.jpg');
+
+        self::assertFileDoesNotExist($full);
     }
 
     public function testDeleteUserDirectoryRemovesTree(): void

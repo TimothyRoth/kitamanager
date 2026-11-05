@@ -21,6 +21,7 @@ use App\Service\ImageUploader;
 use App\Service\UserPasswordUpdater;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
@@ -34,10 +35,19 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/management')]
 final class ManagementController extends AbstractController
 {
+    private const USERNAME_TAKEN = 'Ein Benutzer mit diesem oder einem sehr ähnlichen Namen existiert bereits. Wählen Sie bitte einen anderen.';
+
     #[Route('/admin', name: 'app_management_admin')]
     #[IsGranted('ROLE_ADMIN')]
-    public function adminAction(Request $request, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, UserRepository $userRepository, ContentRepository $contentRepository, AudienceSynchronizer $audienceSynchronizer): Response
+    public function adminAction(Request $request, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, UserRepository $userRepository, ContentRepository $contentRepository, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
+        $passwordForm = $this->createForm(ChangePasswordType::class);
+        $passwordForm->handleRequest($request);
+
+        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater, $entityManager)) {
+            return $passwordChanged;
+        }
+
         $user = new User();
         $form = $this->createForm(UserType::class, $user, ['is_new' => true]);
         $form->handleRequest($request);
@@ -60,15 +70,12 @@ final class ManagementController extends AbstractController
                 return $this->redirectToRoute('app_management_admin');
 
             } catch (UniqueConstraintViolationException $e) {
-                $form->get('username')->addError(new FormError('Ein Benutzer mit diesem Namen existiert bereits. Wählen Sie bitte einen anderen.'));
+                $form->get('username')->addError(new FormError(self::USERNAME_TAKEN));
             } catch (\Exception $e) {
+                $logger->error('Creating a user failed.', ['exception' => $e]);
                 $this->addFlash('danger', 'Beim Anlegen des Benutzers gab es einen unerwarteten Fehler.');
             }
         }
-
-        $status = $form->isSubmitted() && !$form->isValid()
-            ? Response::HTTP_UNPROCESSABLE_ENTITY
-            : Response::HTTP_OK;
 
         /** @var User $admin */
         $admin = $this->getUser();
@@ -77,7 +84,8 @@ final class ManagementController extends AbstractController
             'users' => $userRepository->getUsersByRole('ROLE_USER'),
             'contents' => $contentRepository->findByCreator($admin),
             'form' => $form->createView(),
-        ], new Response(null, $status));
+            'passwordForm' => $passwordForm->createView(),
+        ], new Response(null, $this->statusFor($form, $passwordForm)));
     }
 
     #[Route('/user', name: 'app_management_user')]
@@ -99,30 +107,21 @@ final class ManagementController extends AbstractController
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
-        if ($passwordForm->isSubmitted() && $passwordForm->isValid()) {
-            $passwordUpdater->update($user, $passwordForm->get('newPassword')->getData());
-            $entityManager->flush();
-            $this->addFlash('success', 'Ihr Passwort wurde erfolgreich geändert.');
-
-            return $this->redirectToRoute('app_management_user');
+        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater, $entityManager)) {
+            return $passwordChanged;
         }
-
-        // 422 when a submitted form is invalid, otherwise Turbo would not
-        // render the response and validation errors would never show up.
-        $formInvalid = ($durationForm->isSubmitted() && !$durationForm->isValid())
-            || ($passwordForm->isSubmitted() && !$passwordForm->isValid());
 
         return $this->render('management/user.html.twig', [
             'contents' => $contentRepository->findByCreator($user),
             'sliderItems' => $sliderItemRepository->findAllForConsumer($user),
             'durationForm' => $durationForm->createView(),
             'passwordForm' => $passwordForm->createView(),
-        ], new Response(null, $formInvalid ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+        ], new Response(null, $this->statusFor($durationForm, $passwordForm)));
     }
 
     #[Route('/admin/edit-user/{id}', name: 'app_management_edit_user')]
     #[IsGranted('ROLE_ADMIN')]
-    public function editUser(Request $request, User $user, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
+    public function editUser(Request $request, User $user, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
         // Capture the allowed targets before the form changes them, so we can
         // retract content for targets that get removed.
@@ -161,26 +160,28 @@ final class ManagementController extends AbstractController
                 return $this->redirectToRoute('app_management_admin');
 
             } catch (UniqueConstraintViolationException $e) {
-                $form->get('username')->addError(new FormError('Ein Benutzer mit diesem Namen existiert bereits. Wählen Sie bitte einen anderen.'));
+                $form->get('username')->addError(new FormError(self::USERNAME_TAKEN));
             } catch (\Exception $e) {
+                $logger->error('Updating a user failed.', ['exception' => $e]);
                 $this->addFlash('danger', 'Beim Aktualisieren des Benutzers gab es einen unerwarteten Fehler.');
             }
         }
-
-        $formInvalid = ($form->isSubmitted() && !$form->isValid())
-            || ($devicePinForm->isSubmitted() && !$devicePinForm->isValid());
 
         return $this->render('management/edit_user.html.twig', [
             'user' => $user,
             'form' => $form->createView(),
             'devicePinForm' => $devicePinForm->createView(),
-        ], new Response(null, $formInvalid ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+        ], new Response(null, $this->statusFor($form, $devicePinForm)));
     }
 
     #[Route('/admin/delete-user/{id}', name: 'app_management_delete_user', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     public function deleteUser(Request $request, User $user, EntityManagerInterface $entityManager): Response
     {
+        if ($user->isAdmin()) {
+            throw $this->createAccessDeniedException();
+        }
+
         if ($this->isCsrfTokenValid('delete' . $user->getId(), $request->request->get('_token'))) {
             $entityManager->remove($user);
             $entityManager->flush();
@@ -223,9 +224,9 @@ final class ManagementController extends AbstractController
             $failed = [];
             foreach ($imageFiles as $imageFile) {
                 // No-JS fallback path: downscale oversized images here as well.
-                if ($imageDownscaler->needsDownscale($imageFile->getPathname())) {
+                if ($imageDownscaler->needsTvPreparation($imageFile->getPathname())) {
                     try {
-                        $imageDownscaler->downscale($imageFile->getPathname());
+                        $imageDownscaler->prepareForTv($imageFile->getPathname());
                     } catch (ImageDownscaleException $e) {
                         $failed[] = $imageFile->getClientOriginalName() . ': ' . $e->getMessage();
                         continue;
@@ -274,7 +275,7 @@ final class ManagementController extends AbstractController
      */
     #[Route('/user/upload-image', name: 'app_management_upload_image', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function uploadImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): JsonResponse
+    public function uploadImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): JsonResponse
     {
         // Body exceeded post_max_size: PHP dropped the whole request payload.
         if ($this->isTruncatedUpload($request)) {
@@ -311,9 +312,9 @@ final class ManagementController extends AbstractController
         }
 
         $downscaled = false;
-        if ($imageDownscaler->needsDownscale($file->getPathname())) {
+        if ($imageDownscaler->needsTvPreparation($file->getPathname())) {
             try {
-                $imageDownscaler->downscale($file->getPathname());
+                $imageDownscaler->prepareForTv($file->getPathname());
                 $downscaled = true;
             } catch (ImageDownscaleException $e) {
                 return $this->uploadError($e->getMessage());
@@ -338,6 +339,8 @@ final class ManagementController extends AbstractController
             $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
             $entityManager->flush();
         } catch (\Exception $e) {
+            $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+
             return $this->uploadError('Beim Speichern des Bildes gab es einen unerwarteten Fehler.', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
@@ -356,12 +359,12 @@ final class ManagementController extends AbstractController
      */
     private function downscaleOrAddError(ImageDownscaler $imageDownscaler, UploadedFile $imageFile, FormInterface $form): bool
     {
-        if (!$imageDownscaler->needsDownscale($imageFile->getPathname())) {
+        if (!$imageDownscaler->needsTvPreparation($imageFile->getPathname())) {
             return true;
         }
 
         try {
-            $imageDownscaler->downscale($imageFile->getPathname());
+            $imageDownscaler->prepareForTv($imageFile->getPathname());
 
             return true;
         } catch (ImageDownscaleException $e) {
@@ -461,14 +464,14 @@ final class ManagementController extends AbstractController
             $imageFile = $form->get('imageFile')->getData();
 
             if (null === $imageFile || $this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
+                $replacedImageUrl = null;
                 if ($imageFile) {
-                    $oldImageUrl = $content->getImageUrl();
-                    $newImageUrl = $imageUploader->upload($imageFile, $creator->getId());
-                    $content->setImageUrl($newImageUrl);
-                    $imageUploader->delete($oldImageUrl);
+                    $replacedImageUrl = $content->getImageUrl();
+                    $content->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
                 }
 
                 $entityManager->flush();
+                $imageUploader->delete($replacedImageUrl);
 
                 if ($form->has('audience')) {
                     ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
@@ -549,11 +552,8 @@ final class ManagementController extends AbstractController
         $this->denyAccessUnlessGranted('MANAGE', $item);
 
         if ($this->isCsrfTokenValid('move-up' . $item->getId(), $request->request->get('_token'))) {
-            $previous = $this->adjacentSliderItem($sliderItemRepository, $item, 'up');
-            if ($previous) {
-                $this->swapOrder($item, $previous);
-                $entityManager->flush();
-            }
+            $this->moveSliderItem($item, -1, $sliderItemRepository);
+            $entityManager->flush();
         }
 
         return $this->redirectToRoute('app_management_user');
@@ -565,11 +565,8 @@ final class ManagementController extends AbstractController
         $this->denyAccessUnlessGranted('MANAGE', $item);
 
         if ($this->isCsrfTokenValid('move-down' . $item->getId(), $request->request->get('_token'))) {
-            $next = $this->adjacentSliderItem($sliderItemRepository, $item, 'down');
-            if ($next) {
-                $this->swapOrder($item, $next);
-                $entityManager->flush();
-            }
+            $this->moveSliderItem($item, 1, $sliderItemRepository);
+            $entityManager->flush();
         }
 
         return $this->redirectToRoute('app_management_user');
@@ -592,31 +589,21 @@ final class ManagementController extends AbstractController
         return $this->redirectToRoute('app_management_user');
     }
 
-    private function adjacentSliderItem(SliderItemRepository $repository, SliderItem $item, string $direction): ?SliderItem
+    private function moveSliderItem(SliderItem $item, int $offset, SliderItemRepository $repository): void
     {
-        $qb = $repository->createQueryBuilder('si')
-            ->andWhere('si.consumer = :consumer')
-            ->setParameter('consumer', $item->getConsumer())
-            ->setMaxResults(1);
+        $items = $repository->findAllForConsumer($item->getConsumer());
+        $position = array_search($item, $items, true);
+        $newPosition = $position + $offset;
 
-        if ('up' === $direction) {
-            $qb->andWhere('si.displayOrder < :order')
-                ->orderBy('si.displayOrder', 'DESC');
-        } else {
-            $qb->andWhere('si.displayOrder > :order')
-                ->orderBy('si.displayOrder', 'ASC');
+        if (!isset($items[$newPosition])) {
+            return;
         }
 
-        return $qb->setParameter('order', $item->getDisplayOrder())
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
+        [$items[$position], $items[$newPosition]] = [$items[$newPosition], $items[$position]];
 
-    private function swapOrder(SliderItem $a, SliderItem $b): void
-    {
-        $orderA = $a->getDisplayOrder();
-        $a->setDisplayOrder($b->getDisplayOrder());
-        $b->setDisplayOrder($orderA);
+        foreach ($items as $index => $sliderItem) {
+            $sliderItem->setDisplayOrder($index + 1);
+        }
     }
 
     /**
@@ -636,6 +623,32 @@ final class ManagementController extends AbstractController
         }
 
         return ['ids' => $ids, 'all' => (bool) $form->get('audienceAll')->getData()];
+    }
+
+    private function changeOwnPassword(FormInterface $passwordForm, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager): ?Response
+    {
+        if (!$passwordForm->isSubmitted() || !$passwordForm->isValid()) {
+            return null;
+        }
+
+        /** @var User $user */
+        $user = $this->getUser();
+        $passwordUpdater->update($user, $passwordForm->get('newPassword')->getData());
+        $entityManager->flush();
+        $this->addFlash('success', 'Ihr Passwort wurde erfolgreich geändert.');
+
+        return $this->redirectToRoute($this->dashboardRoute());
+    }
+
+    private function statusFor(FormInterface ...$forms): int
+    {
+        foreach ($forms as $form) {
+            if ($form->isSubmitted() && !$form->isValid()) {
+                return Response::HTTP_UNPROCESSABLE_ENTITY;
+            }
+        }
+
+        return Response::HTTP_OK;
     }
 
     private function dashboardRoute(): string

@@ -51,7 +51,6 @@ final class SliderController extends AbstractController
                 return $this->redirectToSliderWithPinCookie($user, $pin);
             }
 
-            // 422 so Turbo renders the error response of the form submission.
             return $this->render('slider/display.html.twig', [
                 'error' => 'Diese PIN ist keiner Kita zugeordnet. Bitte prüfen Sie die Eingabe und versuchen Sie es erneut.',
             ], new Response(null, Response::HTTP_UNPROCESSABLE_ENTITY));
@@ -108,22 +107,34 @@ final class SliderController extends AbstractController
      * longer belongs to the displayed user (admin changed or removed it), the
      * device is sent back to the PIN page within one poll interval.
      *
+     * A linked device follows its PIN, not the address it was opened with:
+     * renaming a Kita changes its slug while its TVs keep polling the old one.
+     * A logged-in manager is previewing and is never treated as a linked device.
+     *
      * A browser that opens /slider/display directly sends the PIN cookie.
      * A signage iframe on internal HTTP cannot keep that cookie (SameSite=None
      * would require HTTPS), so the TV page stores the PIN itself and repeats
      * it in the X-Display-Pin header.
      */
     #[Route('/slider/{slug}/content', name: 'app_slider_content', methods: ['GET'])]
-    public function content(User $user, Request $request, SliderItemRepository $sliderItemRepository, UserRepository $userRepository): JsonResponse
+    public function content(string $slug, Request $request, SliderItemRepository $sliderItemRepository, UserRepository $userRepository): JsonResponse
     {
-        $pin = $this->linkedPin($request);
+        $user = $userRepository->findOneBy(['slug' => $slug]);
+        $devicePin = $this->getUser() ? null : $this->linkedPin($request);
 
-        if (null !== $pin) {
-            $pinUser = $userRepository->findOneBy(['devicePin' => $pin]);
+        if (null !== $devicePin) {
+            $linkedUser = $userRepository->findOneBy(['devicePin' => $devicePin]);
+            $showsItsOwnKita = null !== $linkedUser && (null === $user || $user === $linkedUser);
 
-            if (!$pinUser || $pinUser->getId() !== $user->getId()) {
+            if (!$showsItsOwnKita) {
                 return new JsonResponse(['unlinked' => true]);
             }
+
+            $user = $linkedUser;
+        }
+
+        if (null === $user) {
+            throw $this->createNotFoundException();
         }
 
         $items = $sliderItemRepository->findEnabledForConsumer($user);

@@ -1,0 +1,59 @@
+framework:
+    html_sanitizer:
+        sanitizers:
+            # Article text written in the management editor and shown on the TV.
+            article_body:
+                # What the editor's toolbar produces. No attributes are allowed.
+                allow_elements:
+                    p: []
+                    br: []
+                    div: []
+                    h2: []
+                    h3: []
+                    strong: []
+                    b: []
+                    em: []
+                    i: []
+                    u: []
+                    ul: []
+                    ol: []
+                    li: []
+                # Pasted markup: the tag goes, its text stays.
+                # Every element not named here is removed together with its content.
+                block_elements:
+                    - span
+                    - font
+                    - a
+                    - h1
+                    - h4
+                    - h5
+                    - h6
+                    - blockquote
+                    - pre
+                    - code
+                    - small
+                    - sub
+                    - sup
+                    - s
+                    - del
+                    - ins
+                    - mark
+                    - center
+                    - section
+                    - article
+                    - header
+                    - footer
+                    - main
+                    - table
+                    - thead
+                    - tbody
+                    - tfoot
+                    - tr
+                    - td
+                    - th
+                    - dl
+                    - dt
+                    - dd
+                    - figure
+                    - figcaption
+                max_input_length: -1

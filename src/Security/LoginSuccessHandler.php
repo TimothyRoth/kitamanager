@@ -19,14 +19,10 @@ readonly class LoginSuccessHandler implements AuthenticationSuccessHandlerInterf
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token): RedirectResponse
     {
-        if ($this->authorizationChecker->isGranted('ROLE_ADMIN')) {
-            return new RedirectResponse($this->router->generate('app_management_admin'));
-        }
+        $dashboard = $this->authorizationChecker->isGranted('ROLE_ADMIN')
+            ? 'app_management_admin'
+            : 'app_management_user';
 
-        if ($this->authorizationChecker->isGranted('ROLE_USER')) {
-            return new RedirectResponse($this->router->generate('app_management_user'));
-        }
-
-        return new RedirectResponse($this->router->generate('app_login'));
+        return new RedirectResponse($this->router->generate($dashboard));
     }
 }

@@ -13,7 +13,8 @@ http://tv-dpm.drk-coe.de/                ← NUR Entry-HTML
 http://dpm.drk-coe.de/slider/display     ← App (PIN → Slider)
 
 Browser (ohne iframe), alle Geräte:
-http://dpm.drk-coe.de/                   ← volle Website
+http://dpm.drk-coe.de/                   ← PIN-Seite (identisch zu /slider/display)
+http://dpm.drk-coe.de/admin              ← Anmeldung / Verwaltung
 ```
 
 | Host | Für wen | Inhalt |
@@ -61,9 +62,11 @@ https://www.ppds.com/de-de/downloads/products/digital-signage/signage-2000-serie
 
 Vierstellige PIN pro Kita; einmal am Gerät. Speicherung in der eingebetteten Seite; PIN-POST ohne Session/CSRF.
 
+Die PIN vergibt der Admin beim Bearbeiten der Kita ("Fernseher zuordnen"). Ändert oder entfernt er sie, fällt das Gerät bei der nächsten Abfrage (alle 30 Sekunden) auf die PIN-Eingabe zurück.
+
 ## Abnahme
 
-- Browser: `http://dpm.drk-coe.de/` = normale Website.  
+- Browser: `http://dpm.drk-coe.de/` zeigt die PIN-Seite, `http://dpm.drk-coe.de/admin` die Anmeldung.  
 - SmartInfo: `http://tv-dpm.drk-coe.de/` öffnet, darin PIN/Slider von `dpm.drk-coe.de`.  
 - Andere PIN → andere Kita.  
 - Kein „Smartinfo not available“ für die TV-Entry-URL.

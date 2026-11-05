@@ -41,7 +41,7 @@
             <div class="settings-accordion-body">
                 <div class="settings-block">
                     <h3>Dauer zwischen den Slides</h3>
-                    {{ form_start(durationForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
+                    {{ form_start(durationForm) }}
                     <div class="form-group">
                         {{ form_row(durationForm.durationBetweenSlides) }}
                     </div>
@@ -49,18 +49,7 @@
                     {{ form_end(durationForm) }}
                 </div>
 
-                <div class="settings-block">
-                    <h3>Passwort ändern</h3>
-                    {{ form_start(passwordForm, {'attr': {'data-turbo-scroll': 'false'}}) }}
-                    <div class="form-group">
-                        {{ form_row(passwordForm.currentPassword) }}
-                    </div>
-                    <div class="form-group">
-                        {{ form_row(passwordForm.newPassword) }}
-                    </div>
-                    <button type="submit" class="btn btn-primary">Passwort speichern</button>
-                    {{ form_end(passwordForm) }}
-                </div>
+                {{ include('management/_password_form.html.twig') }}
             </div>
         </details>
 
@@ -109,7 +98,7 @@
                                     {% if not loop.first %}
                                         <form class="form-inline" method="post"
                                               action="{{ path('app_management_slider_move_up', {'id': item.id}) }}"
-                                              data-turbo="false" data-preserve-scroll>
+                                              data-preserve-scroll>
                                             <input type="hidden" name="_token"
                                                    value="{{ csrf_token('move-up' ~ item.id) }}">
                                             <button type="submit" class="btn-icon" title="Nach oben"
@@ -121,7 +110,7 @@
                                     {% if not loop.last %}
                                         <form class="form-inline" method="post"
                                               action="{{ path('app_management_slider_move_down', {'id': item.id}) }}"
-                                              data-turbo="false" data-preserve-scroll>
+                                              data-preserve-scroll>
                                             <input type="hidden" name="_token"
                                                    value="{{ csrf_token('move-down' ~ item.id) }}">
                                             <button type="submit" class="btn-icon" title="Nach unten"
@@ -158,7 +147,7 @@
                             {% if isOwnContent %}
                                 <form class="form-inline" method="post"
                                       action="{{ path('app_management_slider_toggle_status', {'id': item.id}) }}"
-                                      data-turbo="false" data-preserve-scroll>
+                                      data-preserve-scroll>
                                     <input type="hidden" name="_token"
                                            value="{{ csrf_token('toggle-status' ~ item.id) }}">
                                     <button type="submit"
@@ -198,8 +187,7 @@
                     <a href="{{ path('app_management_create_article') }}" class="btn btn-secondary">Artikel hinzufügen</a>
                     <form id="bulkDeleteForm" method="post"
                           action="{{ path('app_management_bulk_delete_content') }}"
-                          data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt."
-                          data-turbo-scroll="false">
+                          data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt.">
                         <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
                         <input type="hidden" name="_redirect" value="app_management_user">
                         <button type="submit" class="btn btn-danger" data-bulk-submit disabled>Ausgewählte löschen</button>
@@ -252,8 +240,7 @@
                                class="btn btn-link">Bearbeiten</a>
                             <form class="form-inline" method="post"
                                   action="{{ path('app_management_delete_content', {'id': content.id}) }}"
-                                  data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt."
-                                  data-turbo-scroll="false">
+                                  data-confirm="Sind Sie sicher, dass Sie diesen Inhalt löschen möchten? Er wird bei allen Empfängern entfernt.">
                                 <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ content.id) }}">
                                 <button type="submit" class="btn-link text-danger">Löschen</button>
                             </form>

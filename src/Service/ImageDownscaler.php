@@ -3,8 +3,8 @@
 namespace App\Service;
 
 /**
- * Downscales uploaded images in place so that a single image never exceeds
- * the TV display limit (MAX_BYTES). Works on the temporary upload path
+ * Makes uploaded images ready for the TV in place: upright and no larger
+ * than the TV display limit (MAX_BYTES). Works on the temporary upload path
  * before ImageUploader moves the file into the public uploads directory.
  *
  * Deliberately processes ONE image per call/request: decoding a photo into
@@ -26,11 +26,12 @@ class ImageDownscaler
     public const MAX_ORIGINAL_BYTES = 25_000_000;
 
     /**
-     * Decode-memory guard: GD needs roughly 5 bytes per pixel, so this cap
-     * keeps a single decode at ~320MB, safely inside the 512M memory_limit.
-     * Anything larger is rejected before any decoding happens.
+     * Decode guard: a decoded bitmap needs several bytes of memory per pixel,
+     * so anything larger is rejected before any decoding happens.
      */
     private const MAX_MEGAPIXELS = 64;
+
+    private const EXIF_UPRIGHT = 1;
 
     /** Longest edge of the first downscale attempt (4K displays). */
     private const START_EDGE = 3840;
@@ -40,11 +41,11 @@ class ImageDownscaler
 
     private const JPEG_QUALITY = 82;
 
-    public function needsDownscale(string $path): bool
+    public function needsTvPreparation(string $path): bool
     {
         clearstatcache(true, $path);
 
-        return filesize($path) > self::MAX_BYTES;
+        return filesize($path) > self::MAX_BYTES || $this->isUprightOnlyThroughExif($path);
     }
 
     /**
@@ -56,7 +57,7 @@ class ImageDownscaler
      *
      * @throws ImageDownscaleException with a user-facing German message
      */
-    public function downscale(string $path): void
+    public function prepareForTv(string $path): void
     {
         $info = @getimagesize($path);
         if (false === $info) {
@@ -178,14 +179,9 @@ class ImageDownscaler
      */
     private function applyExifOrientation(\GdImage $image, string $path): \GdImage
     {
-        if (!function_exists('exif_read_data')) {
-            return $image;
-        }
+        $orientation = $this->exifOrientation($path);
 
-        $exif = @exif_read_data($path);
-        $orientation = is_array($exif) ? (int) ($exif['Orientation'] ?? 1) : 1;
-
-        if ($orientation <= 1 || $orientation > 8) {
+        if (self::EXIF_UPRIGHT === $orientation) {
             return $image;
         }
 
@@ -211,6 +207,27 @@ class ImageDownscaler
         }
 
         return $image;
+    }
+
+    /**
+     * The TV engine ignores the EXIF orientation tag, so such a photo would
+     * be shown sideways unless the rotation is baked into its pixels.
+     */
+    private function isUprightOnlyThroughExif(string $path): bool
+    {
+        return self::EXIF_UPRIGHT !== $this->exifOrientation($path);
+    }
+
+    private function exifOrientation(string $path): int
+    {
+        if (!function_exists('exif_read_data')) {
+            return self::EXIF_UPRIGHT;
+        }
+
+        $exif = @exif_read_data($path);
+        $orientation = is_array($exif) ? (int) ($exif['Orientation'] ?? self::EXIF_UPRIGHT) : self::EXIF_UPRIGHT;
+
+        return $orientation >= 1 && $orientation <= 8 ? $orientation : self::EXIF_UPRIGHT;
     }
 
     /**

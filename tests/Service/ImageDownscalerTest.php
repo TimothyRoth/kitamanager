@@ -30,21 +30,35 @@ final class ImageDownscalerTest extends TestCase
     public function testSmallJpegDoesNotNeedDownscale(): void
     {
         $path = $this->makeJpeg('small.jpg', 100, 80, 90, 0);
-        self::assertFalse($this->downscaler->needsDownscale($path));
+        self::assertFalse($this->downscaler->needsTvPreparation($path));
     }
 
     public function testLargeJpegIsDownscaledBelowLimit(): void
     {
         $path = $this->makeJpeg('large.jpg', 4500, 3500, 95, 150000);
         self::assertGreaterThan(ImageDownscaler::MAX_BYTES, filesize($path));
-        self::assertTrue($this->downscaler->needsDownscale($path));
+        self::assertTrue($this->downscaler->needsTvPreparation($path));
 
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
 
         self::assertLessThanOrEqual(ImageDownscaler::MAX_BYTES, filesize($path));
         $info = getimagesize($path);
         self::assertNotFalse($info);
         self::assertSame('image/jpeg', $info['mime']);
+    }
+
+    public function testSmallPhotoRotatedOnlyByExifIsStoredUpright(): void
+    {
+        $path = $this->makeJpeg('sideways.jpg', 400, 300, 90, 0);
+        $this->tagAsRotatedClockwise($path);
+        self::assertLessThan(ImageDownscaler::MAX_BYTES, filesize($path));
+
+        self::assertTrue($this->downscaler->needsTvPreparation($path));
+        $this->downscaler->prepareForTv($path);
+
+        [$width, $height] = getimagesize($path);
+        self::assertSame([300, 400], [$width, $height]);
+        self::assertFalse($this->downscaler->needsTvPreparation($path));
     }
 
     public function testCorruptFileThrows(): void
@@ -53,7 +67,7 @@ final class ImageDownscalerTest extends TestCase
         file_put_contents($path, 'not-an-image');
 
         $this->expectException(ImageDownscaleException::class);
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
     }
 
     public function testGifCannotBeDownscaled(): void
@@ -64,7 +78,7 @@ final class ImageDownscalerTest extends TestCase
 
         $this->expectException(ImageDownscaleException::class);
         $this->expectExceptionMessage('GIF');
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
     }
 
     public function testUnsupportedMimeThrows(): void
@@ -76,7 +90,7 @@ final class ImageDownscalerTest extends TestCase
 
         $this->expectException(ImageDownscaleException::class);
         $this->expectExceptionMessage('Bildformat');
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
     }
 
     public function testMegapixelGuardRejectsBeforeDecode(): void
@@ -87,15 +101,15 @@ final class ImageDownscalerTest extends TestCase
 
         $this->expectException(ImageDownscaleException::class);
         $this->expectExceptionMessage('Megapixel');
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
     }
 
     public function testOpaquePngIsReencodedAsJpeg(): void
     {
         $path = $this->makeOpaquePngAboveLimit('opaque.png');
-        self::assertTrue($this->downscaler->needsDownscale($path));
+        self::assertTrue($this->downscaler->needsTvPreparation($path));
 
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
 
         self::assertLessThanOrEqual(ImageDownscaler::MAX_BYTES, filesize($path));
         $info = getimagesize($path);
@@ -106,9 +120,9 @@ final class ImageDownscalerTest extends TestCase
     public function testTransparentPngStaysPng(): void
     {
         $path = $this->makeTransparentPngAboveLimit('alpha.png');
-        self::assertTrue($this->downscaler->needsDownscale($path));
+        self::assertTrue($this->downscaler->needsTvPreparation($path));
 
-        $this->downscaler->downscale($path);
+        $this->downscaler->prepareForTv($path);
 
         self::assertLessThanOrEqual(ImageDownscaler::MAX_BYTES, filesize($path));
         $info = getimagesize($path);
@@ -127,6 +141,19 @@ final class ImageDownscalerTest extends TestCase
         imagejpeg($img, $path, $quality);
 
         return $path;
+    }
+
+    /**
+     * Inserts an EXIF block with Orientation = 6 ("rotate 90° clockwise to display").
+     */
+    private function tagAsRotatedClockwise(string $jpegPath): void
+    {
+        $orientationEntry = "\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00";
+        $tiff = "MM\x00\x2A\x00\x00\x00\x08" . "\x00\x01" . $orientationEntry . "\x00\x00\x00\x00";
+        $exif = "Exif\x00\x00" . $tiff;
+        $jpeg = file_get_contents($jpegPath);
+
+        file_put_contents($jpegPath, substr($jpeg, 0, 2) . "\xFF\xE1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2));
     }
 
     private function makeOpaquePngAboveLimit(string $name): string

@@ -2,7 +2,7 @@
 
 {% block title %}Slider{% endblock %}
 
-{# TV pages: ES5-only tv.js, no Turbo/importmap. tv.css has no CSS variables /
+{# TV pages: ES5-only tv.js instead of script.js. tv.css has no CSS variables /
    Grid; slider.css already uses literal colors for the kiosk viewport. #}
 {% block stylesheets %}
     <link rel="stylesheet" href="{{ asset('css/tv.css') }}">
@@ -11,7 +11,6 @@
 {% block app_javascripts %}
     <script src="{{ asset('js/tv.js') }}" defer></script>
 {% endblock %}
-{% block importmap %}{% endblock %}
 
 {% block body %}
     {# Outside the viewport so content refresh (innerHTML swap) keeps it. #}

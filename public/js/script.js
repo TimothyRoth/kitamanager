@@ -7,24 +7,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // (matches the server-side "25M" constraint, 10^6 bytes per "M").
     const MAX_ORIGINAL_BYTES = 25 * 1000 * 1000;
 
-    // Add confirmation to specific forms
-    const confirmForms = document.querySelectorAll('form[data-confirm]');
-    confirmForms.forEach(form => {
-        form.addEventListener('submit', (e) => {
-            if (!confirm(form.getAttribute('data-confirm'))) {
-                e.preventDefault();
-            }
+    const initConfirmForms = () => {
+        document.querySelectorAll('form[data-confirm]').forEach(form => {
+            form.addEventListener('submit', (e) => {
+                if (!confirm(form.getAttribute('data-confirm'))) {
+                    e.preventDefault();
+                }
+            });
         });
-    });
+    };
 
     // Initialize WYSIWYG Editor
     const initWysiwyg = () => {
         const textareas = document.querySelectorAll('.wysiwyg');
 
         textareas.forEach(textarea => {
-            if (textarea.dataset.editorInitialized === "true") return;
-            textarea.dataset.editorInitialized = "true";
-
             const wrapper = document.createElement('div');
             wrapper.className = 'wysiwyg-wrapper';
             textarea.parentNode.insertBefore(wrapper, textarea);
@@ -124,9 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pairs.forEach(({checkbox, list}) => {
             document.querySelectorAll(checkbox).forEach(input => {
-                if (input.dataset.allToggleInitialized === 'true') return;
-                input.dataset.allToggleInitialized = 'true';
-
                 const form = input.closest('form') || document;
                 const target = form.querySelector(list);
                 if (!target) return;
@@ -157,10 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Choice picker for long Kita/audience lists: search, counts, bulk select.
     const initChoiceFilter = () => {
         document.querySelectorAll('.choice-list').forEach(list => {
-            if (list.dataset.filterInitialized === 'true') return;
-
             const items = Array.from(list.querySelectorAll('.form-check'));
-            list.dataset.filterInitialized = 'true';
 
             // Compact chip layout for every list; toolbar only when it scales.
             items.forEach(item => {
@@ -281,9 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.querySelectorAll('form[data-preserve-scroll]').forEach(form => {
-            if (form.dataset.scrollInit === 'true') return;
-            form.dataset.scrollInit = 'true';
-
             form.addEventListener('submit', () => {
                 const row = form.closest('[id]');
                 if (row && row.id) {
@@ -301,9 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const inputs = document.querySelectorAll('.image-multi-upload');
 
         inputs.forEach(input => {
-            if (input.dataset.previewInitialized === "true") return;
-            input.dataset.previewInitialized = "true";
-
             const preview = document.createElement('div');
             preview.className = 'image-preview-grid';
             input.parentNode.insertBefore(preview, input.nextSibling);
@@ -638,11 +623,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initUploadProgress = () => {
         document.querySelectorAll('form[data-upload-with-progress]').forEach(form => {
-            if (form.dataset.uploadProgressInitialized === 'true') {
-                return;
-            }
-            form.dataset.uploadProgressInitialized = 'true';
-
             const ui = createUploadProgressUi(form);
 
             const resetUi = () => {
@@ -792,6 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Run initializations
+    initConfirmForms();
     initWysiwyg();
     initBulkDelete();
     initImagePreview();
@@ -799,15 +780,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initChoiceFilter();
     initAllToggles();
     initScrollPreservation();
-
-    // Re-initialize on Turbo render if applicable
-    document.addEventListener('turbo:render', () => {
-        initWysiwyg();
-        initBulkDelete();
-        initImagePreview();
-        initUploadProgress();
-        initChoiceFilter();
-        initAllToggles();
-        initScrollPreservation();
-    });
 });
