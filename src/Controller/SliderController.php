@@ -87,8 +87,7 @@ final class SliderController extends AbstractController
             }
         }
 
-        $items = $sliderItemRepository->findEnabledForConsumer($user);
-        $slides = $this->renderView('slider/_slides.html.twig', ['items' => $items]);
+        $slides = $this->renderSlides($user, true, $sliderItemRepository);
 
         return $this->render('slider/slider.html.twig', [
             'user' => $user,
@@ -115,6 +114,10 @@ final class SliderController extends AbstractController
      * A signage iframe on internal HTTP cannot keep that cookie (SameSite=None
      * would require HTTPS), so the TV page stores the PIN itself and repeats
      * it in the X-Display-Pin header.
+     *
+     * "lazy" is sent by the current tv.js, which loads slide images one by
+     * one. TVs that loaded an older tv.js keep polling without it and must
+     * keep getting images they can show as they are.
      */
     #[Route('/slider/{slug}/content', name: 'app_slider_content', methods: ['GET'])]
     public function content(string $slug, Request $request, SliderItemRepository $sliderItemRepository, UserRepository $userRepository): JsonResponse
@@ -137,13 +140,20 @@ final class SliderController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $items = $sliderItemRepository->findEnabledForConsumer($user);
-        $slides = $this->renderView('slider/_slides.html.twig', ['items' => $items]);
+        $slides = $this->renderSlides($user, $request->query->getBoolean('lazy'), $sliderItemRepository);
 
         return new JsonResponse([
             'signature' => md5($slides),
             'duration' => $user->getDurationBetweenSlides() * 1000,
             'html' => $slides,
+        ]);
+    }
+
+    private function renderSlides(User $consumer, bool $lazyImages, SliderItemRepository $sliderItemRepository): string
+    {
+        return $this->renderView('slider/_slides.html.twig', [
+            'items' => $sliderItemRepository->findEnabledForConsumer($consumer),
+            'lazy_images' => $lazyImages,
         ]);
     }
 

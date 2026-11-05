@@ -764,6 +764,49 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertStringContainsString('Frisch auf dem TV', $after['html']);
     }
 
+    public function testSliderPageLoadsOnlyTheFirstSlideImageUpFront(): void
+    {
+        foreach (['Eins', 'Zwei', 'Drei'] as $title) {
+            $this->createArticle($this->kitaA, $title);
+        }
+
+        $crawler = $this->client->request('GET', '/slider/kita-a');
+
+        self::assertCount(3, $crawler->filter('.tv-slide'));
+        self::assertCount(1, $crawler->filter('.tv-slide img[src]'));
+        self::assertCount(1, $crawler->filter('.tv-slide.is-active img[src]'));
+        self::assertCount(2, $crawler->filter('.tv-slide img[data-src]:not([src])'));
+    }
+
+    public function testPollServesWaitingImagesOnlyToTheScriptThatAsksForThem(): void
+    {
+        foreach (['Eins', 'Zwei', 'Drei'] as $title) {
+            $this->createArticle($this->kitaA, $title);
+        }
+
+        $this->client->request('GET', '/slider/kita-a/content');
+        $forTvsRunningTheOldScript = json_decode($this->client->getResponse()->getContent(), true)['html'];
+        self::assertSame(3, substr_count($forTvsRunningTheOldScript, '<img src='));
+        self::assertStringNotContainsString('data-src', $forTvsRunningTheOldScript);
+
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1');
+        $forTheCurrentScript = json_decode($this->client->getResponse()->getContent(), true)['html'];
+        self::assertSame(1, substr_count($forTheCurrentScript, '<img src='));
+        self::assertSame(2, substr_count($forTheCurrentScript, '<img data-src='));
+    }
+
+    public function testSliderPageAndItsPollAgreeOnTheContentSignature(): void
+    {
+        $this->createArticle($this->kitaA, 'Eins');
+        $this->createArticle($this->kitaA, 'Zwei');
+
+        $crawler = $this->client->request('GET', '/slider/kita-a');
+        $signatureInPage = $crawler->filter('#tv-slider')->attr('data-content-signature');
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1');
+
+        self::assertSame($signatureInPage, json_decode($this->client->getResponse()->getContent(), true)['signature']);
+    }
+
     public function testRenamedKitaKeepsFeedingItsLinkedTv(): void
     {
         $this->createArticle($this->kitaA, 'Vor der Umbenennung');
