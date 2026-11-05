@@ -49,6 +49,43 @@
 
     var rotationTimer = null;
 
+    // Only the first slide arrives with its image in "src"; the others keep
+    // the address in "data-src". A slider with hundreds of photos would
+    // otherwise load them all at once, which a TV cannot take.
+    function loadImages(slide) {
+        var images = slide.getElementsByTagName('img');
+        for (var i = 0; i < images.length; i++) {
+            var address = images[i].getAttribute('data-src');
+            if (address && !images[i].getAttribute('src')) {
+                images[i].setAttribute('src', address);
+            }
+        }
+    }
+
+    function unloadImages(slide) {
+        var images = slide.getElementsByTagName('img');
+        for (var i = 0; i < images.length; i++) {
+            var address = images[i].getAttribute('src');
+            if (address) {
+                images[i].setAttribute('data-src', address);
+                images[i].removeAttribute('src');
+            }
+        }
+    }
+
+    // Loaded at any time: the slide on screen, the two after it (so each has
+    // two slide durations to arrive on a slow connection) and the previous
+    // one (still fading out).
+    function keepImagesAround(slides, index) {
+        loadImages(slides[index]);
+        loadImages(slides[(index + 1) % slides.length]);
+        loadImages(slides[(index + 2) % slides.length]);
+
+        if (slides.length > 4) {
+            unloadImages(slides[(index - 2 + slides.length) % slides.length]);
+        }
+    }
+
     // (Re)start the rotation interval, continuing from whichever slide is
     // currently active so a background content refresh doesn't jump.
     function startRotation(viewport) {
@@ -58,11 +95,9 @@
         }
 
         var slides = toArray(viewport.querySelectorAll('.tv-slide'));
-        if (slides.length <= 1) {
-            return; // No need to rotate 0 or 1 item
+        if (slides.length === 0) {
+            return;
         }
-
-        var duration = parseInt(viewport.getAttribute('data-duration'), 10) || 10000;
 
         var currentIndex = -1;
         for (var i = 0; i < slides.length; i++) {
@@ -76,10 +111,26 @@
             addClass(slides[0], 'is-active');
         }
 
+        // Fresh markup always has the first slide's image loaded, also when
+        // the rotation continues somewhere else.
+        for (var j = 0; j < slides.length; j++) {
+            if (j !== currentIndex) {
+                unloadImages(slides[j]);
+            }
+        }
+        keepImagesAround(slides, currentIndex);
+
+        if (slides.length === 1) {
+            return; // Nothing to rotate
+        }
+
+        var duration = parseInt(viewport.getAttribute('data-duration'), 10) || 10000;
+
         rotationTimer = setInterval(function () {
             removeClass(slides[currentIndex], 'is-active');
             currentIndex = (currentIndex + 1) % slides.length;
             addClass(slides[currentIndex], 'is-active');
+            keepImagesAround(slides, currentIndex);
         }, duration);
     }
 
@@ -130,7 +181,7 @@
             try {
                 var xhr = new XMLHttpRequest();
                 var separator = url.indexOf('?') === -1 ? '?' : '&';
-                xhr.open('GET', url + separator + '_=' + new Date().getTime(), true);
+                xhr.open('GET', url + separator + 'lazy=1&_=' + new Date().getTime(), true);
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
                 var storedPin = readStoredPin();
                 if (storedPin) {

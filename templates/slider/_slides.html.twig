@@ -1,16 +1,21 @@
+{# With lazy_images only the first slide carries its image address in "src";
+   the others keep it in "data-src" until tv.js loads them shortly before
+   their turn. A slider with hundreds of photos must not load them all at once.
+   TVs still running an older tv.js poll without that flag and get "src" everywhere. #}
 {% for item in items %}
     {% set content = item.content %}
+    {% set image_attribute = lazy_images and not loop.first ? 'data-src' : 'src' %}
     {% if content.type.value == 'image' %}
         <div class="tv-slide tv-slide-image {% if loop.first %}is-active{% endif %}"
              data-slide-key="{{ content.id }}-{{ content.lastUpdatedAt.timestamp }}">
-            <img src="{{ asset(content.imageUrl) }}" alt="Slider Image">
+            <img {{ image_attribute }}="{{ asset(content.imageUrl) }}" alt="Slider Image">
         </div>
     {% elseif content.type.value == 'article' %}
         <div class="tv-slide tv-slide-article {% if loop.first %}is-active{% endif %}"
              data-slide-key="{{ content.id }}-{{ content.lastUpdatedAt.timestamp }}">
             <div class="tv-article-media">
                 {% if content.imageUrl %}
-                    <img src="{{ asset(content.imageUrl) }}" alt="Article Image">
+                    <img {{ image_attribute }}="{{ asset(content.imageUrl) }}" alt="Article Image">
                 {% endif %}
             </div>
             <div class="tv-article-content">
