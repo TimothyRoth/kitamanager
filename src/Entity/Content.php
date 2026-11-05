@@ -50,7 +50,7 @@ class Content
     /**
      * @var Collection<int, SliderItem>
      */
-    #[ORM\OneToMany(targetEntity: SliderItem::class, mappedBy: 'content', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: SliderItem::class, mappedBy: 'content', cascade: ['persist', 'remove'], orphanRemoval: true, fetch: 'EXTRA_LAZY')]
     private Collection $sliderItems;
 
     public function __construct()

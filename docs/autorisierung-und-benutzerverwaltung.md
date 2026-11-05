@@ -153,6 +153,7 @@ classDiagram
 ### Login & Rollen
 - [ ] Login mit falschen Daten schlägt fehl, Fehlermeldung erscheint.
 - [ ] Admin landet nach Login auf `/management/admin`, Kita auf `/management/user`.
+- [ ] Wer bereits angemeldet ist und `/admin` aufruft, landet direkt im eigenen Dashboard.
 - [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
 - [ ] Logout beendet die Sitzung.
@@ -162,6 +163,7 @@ classDiagram
 
 ### Benutzerverwaltung (nur Admin)
 - [ ] Admin kann neue Kita anlegen; sie erscheint in der Benutzerliste.
+- [ ] Ab neun Kitas steht über der Liste ein Suchfeld; es blendet alle Kitas aus, deren Name den Suchtext nicht enthält.
 - [ ] Der Benutzername ist Pflicht und darf keinen Schrägstrich enthalten. Ein Name, der dieselbe Slider-Adresse ergäbe wie ein vorhandener (z. B. "Kita A" neben "kita-a"), wird abgelehnt.
 - [ ] Admin kann Passwort einer Kita ändern.
 - [ ] Admin kann das eigene Passwort im Dashboard ändern (aktuelles Passwort erforderlich).
@@ -175,6 +177,7 @@ classDiagram
 - [ ] Zentrale Inhalte des Admins erscheinen im Slider aller erlaubten Kitas.
 - [ ] Entzieht der Admin einer Kita ein Ziel, verschwinden dort die bereits ausgespielten Inhalte dieses Erstellers.
 - [ ] Nur der Ersteller (oder Admin) kann einen Inhalt bearbeiten/löschen.
+- [ ] Eigene Inhalte stehen mit dem neuesten zuerst. Listen mit mehr als zwölf Einträgen werden nicht länger als der Bildschirm und lassen sich in ihrem Feld scrollen.
 - [ ] Artikeltext behält die Formatierung des Editors (Überschriften, fett, kursiv, Listen). Skripte, Bilder, Links und sonstiges eingefügtes HTML werden entfernt; der Text darin bleibt erhalten.
 - [ ] Fotos erscheinen aufrecht, auch wenn die Drehung nur in den Bilddaten (EXIF) vermerkt ist.
 

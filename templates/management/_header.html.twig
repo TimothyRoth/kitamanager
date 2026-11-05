@@ -1,6 +1,7 @@
 {% import '_icons.html.twig' as icons %}
+{{ include('_icon_sprite.html.twig') }}
 <header class="app-bar">
-    <a class="app-bar-brand" href="{{ path(is_granted('ROLE_ADMIN') ? 'app_management_admin' : 'app_management_user') }}">
+    <a class="app-bar-brand" href="{{ path('app_login') }}">
         <span class="app-bar-logo">{{ icons.icon('tv') }}</span>
         Kita-Manager
     </a>

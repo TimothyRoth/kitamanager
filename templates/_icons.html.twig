@@ -1,39 +1,4 @@
-{% macro icon(name) %}
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        {%- if name == 'grip' -%}
-            <g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></g>
-        {%- elseif name == 'camera' -%}
-            <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>
-        {%- elseif name == 'document' -%}
-            <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/>
-        {%- elseif name == 'eye' -%}
-            <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>
-        {%- elseif name == 'eye-off' -%}
-            <path d="M3 3l18 18"/><path d="M10.6 5.7A9.8 9.8 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17 17 0 0 1-3.3 4M6.3 6.9A16.6 16.6 0 0 0 2 12s3.6 6.5 10 6.5a9.6 9.6 0 0 0 4.3-1"/><path d="M9.9 9.9a2.8 2.8 0 0 0 4 4"/>
-        {%- elseif name == 'sun' -%}
-            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
-        {%- elseif name == 'moon' -%}
-            <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"/>
-        {%- elseif name == 'plus' -%}
-            <path d="M12 5v14M5 12h14"/>
-        {%- elseif name == 'pencil' -%}
-            <path d="M4 20l1-4.5L16.5 4a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19 4 20z"/>
-        {%- elseif name == 'trash' -%}
-            <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/>
-        {%- elseif name == 'tv' -%}
-            <rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>
-        {%- elseif name == 'back' -%}
-            <path d="M15 5l-7 7 7 7"/>
-        {%- elseif name == 'images' -%}
-            <rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 7V5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-3"/><path d="M3 17l4-4 3 3 2-2 5 5"/>
-        {%- elseif name == 'settings' -%}
-            <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>
-        {%- elseif name == 'lock' -%}
-            <rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
-        {%- elseif name == 'users' -%}
-            <circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.8c1.8.7 3 2.3 3 4.7"/>
-        {%- elseif name == 'logout' -%}
-            <path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/>
-        {%- endif -%}
-    </svg>
-{% endmacro %}
+{# The shapes live in _icon_sprite.html.twig, which every page that uses icons includes once. #}
+{% macro icon(name) -%}
+    <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-{{ name }}"/></svg>
+{%- endmacro %}

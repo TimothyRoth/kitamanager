@@ -14,6 +14,7 @@ use App\Form\UserType;
 use App\Repository\ContentRepository;
 use App\Repository\SliderItemRepository;
 use App\Repository\UserRepository;
+use App\Security\Dashboard;
 use App\Service\AudienceSynchronizer;
 use App\Service\ImageDownscaleException;
 use App\Service\ImageDownscaler;
@@ -37,6 +38,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ManagementController extends AbstractController
 {
     private const USERNAME_TAKEN = 'Ein Benutzer mit diesem oder einem sehr ähnlichen Namen existiert bereits. Wählen Sie bitte einen anderen.';
+
+    public function __construct(private readonly Dashboard $dashboard)
+    {
+    }
 
     #[Route('/admin', name: 'app_management_admin')]
     #[IsGranted('ROLE_ADMIN')]
@@ -506,7 +511,7 @@ final class ManagementController extends AbstractController
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
         }
 
-        return $this->redirectToRoute($this->dashboardRoute());
+        return $this->redirectToRoute($this->dashboard->routeOfCurrentUser());
     }
 
     #[Route('/content/bulk-delete', name: 'app_management_bulk_delete_content', methods: ['POST'])]
@@ -611,7 +616,7 @@ final class ManagementController extends AbstractController
         $entityManager->flush();
         $this->addFlash('success', 'Ihr Passwort wurde erfolgreich geändert.');
 
-        return $this->redirectToRoute($this->dashboardRoute());
+        return $this->redirectToRoute($this->dashboard->routeOfCurrentUser());
     }
 
     private function statusFor(FormInterface ...$forms): int
@@ -623,11 +628,6 @@ final class ManagementController extends AbstractController
         }
 
         return Response::HTTP_OK;
-    }
-
-    private function dashboardRoute(): string
-    {
-        return $this->isGranted('ROLE_ADMIN') ? 'app_management_admin' : 'app_management_user';
     }
 
     /**

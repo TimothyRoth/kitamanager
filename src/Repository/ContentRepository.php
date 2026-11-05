@@ -18,7 +18,7 @@ class ContentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Content created (owned) by a user.
+     * Content created (owned) by a user, newest first.
      *
      * @return Content[]
      */
@@ -27,7 +27,8 @@ class ContentRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->andWhere('c.creator = :creator')
             ->setParameter('creator', $creator)
-            ->orderBy('c.createdAt', 'ASC')
+            ->orderBy('c.createdAt', 'DESC')
+            ->addOrderBy('c.id', 'DESC')
             ->getQuery()
             ->getResult();
     }

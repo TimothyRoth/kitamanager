@@ -53,10 +53,16 @@
                 {% if users is empty %}
                     <p class="empty-state">Keine Benutzer gefunden.</p>
                 {% else %}
-                    <ul class="user-list">
+                    {% if users|length > 8 %}
+                        <div class="list-filter">
+                            <input type="search" placeholder="Kita suchen …" aria-label="Kita suchen" autocomplete="off"
+                                   data-list-filter="#kita-list">
+                            <span class="list-filter-count" data-list-filter-count></span>
+                        </div>
+                    {% endif %}
+                    <ul class="user-list" id="kita-list">
                         {% for user in users %}
-                            <li class="user-row">
-                                <span class="avatar" aria-hidden="true">{{ user.username|split(' ', 2)|last|first|upper }}</span>
+                            <li class="user-row" data-filter-text="{{ user.username }}">
                                 <div class="user-row-text">
                                     <span class="user-row-name">{{ user.username }}</span>
                                     {% if user.devicePin %}
@@ -70,7 +76,7 @@
                                 <div class="user-row-actions">
                                     <a href="{{ path('app_slider', {'slug': user.slug}) }}" class="btn btn-ghost btn-square"
                                        aria-label="Slider von {{ user.username }} ansehen" title="Slider ansehen">{{ icons.icon('eye') }}</a>
-                                    <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-secondary">Bearbeiten</a>
+                                    <a href="{{ path('app_management_edit_user', {'id': user.id}) }}" class="btn btn-secondary">{{ icons.icon('pencil') }}<span class="btn-text-optional">Bearbeiten</span></a>
                                     <form method="post" action="{{ path('app_management_delete_user', {'id': user.id}) }}"
                                           data-confirm="Soll dieser Benutzer mitsamt all seiner Beiträge endgültig gelöscht werden?">
                                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ user.id) }}">
