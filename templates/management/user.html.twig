@@ -74,7 +74,7 @@
                                     <span class="slide-position" data-slide-position>{{ loop.index }}</span>
                                 </div>
                                 <div class="slide-text">
-                                    <span class="slide-title">{{ isArticle ? content.title : 'Bild' }}</span>
+                                    <span class="slide-title"{% if isArticle %} title="{{ content.title }}"{% endif %}>{{ isArticle ? content.title : 'Bild' }}</span>
                                     <span class="slide-source">
                                         {%- if isArticle %}Artikel · {% endif -%}
                                         {%- if isOwnContent -%}

@@ -197,6 +197,13 @@
     margin-top: var(--space-4);
 }
 
+/* Bounded lists carry a negative margin (see management.css). */
+.panel > .slide-list:has(> :nth-child(13)),
+.panel > .content-grid:has(> :nth-child(13)),
+.panel > .user-list:has(> :nth-child(13)) {
+    margin-top: calc(var(--space-4) - var(--space-1));
+}
+
 .panel-header {
     display: flex;
     align-items: center;

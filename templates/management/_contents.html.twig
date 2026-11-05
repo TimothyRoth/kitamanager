@@ -33,7 +33,7 @@
                 </div>
                 <div class="content-card-body">
                     {% if isArticle %}
-                        <span class="content-card-title">{{ content.title }}</span>
+                        <span class="content-card-title" title="{{ content.title }}">{{ content.title }}</span>
                     {% endif %}
                     <span class="content-card-meta">
                         <span class="badge">{{ content.type.getGermanLabel() }}</span>

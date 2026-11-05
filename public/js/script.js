@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!list) return;
 
         const EDGE_SCROLL_ZONE = 72;
-        const EDGE_SCROLL_STEP = 14;
+        const EDGE_SCROLL_MAX_STEP = 32;
 
         const rows = () => Array.from(list.children);
         const currentOrder = () => rows().map(row => row.dataset.itemId);
@@ -58,6 +58,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // A long list scrolls inside its panel, a short one with the page.
+        // The closer the pointer is to the edge, the faster it scrolls.
+        const scrollNearEdge = (pointerY) => {
+            const listScrolls = list.scrollHeight > list.clientHeight;
+            const box = list.getBoundingClientRect();
+            const top = listScrolls ? Math.max(box.top, 0) : 0;
+            const bottom = listScrolls ? Math.min(box.bottom, window.innerHeight) : window.innerHeight;
+            const overTop = top + EDGE_SCROLL_ZONE - pointerY;
+            const overBottom = pointerY - (bottom - EDGE_SCROLL_ZONE);
+            const depth = Math.min(1, Math.max(overTop, overBottom) / EDGE_SCROLL_ZONE);
+            if (depth <= 0) return;
+
+            const distance = Math.ceil(depth * EDGE_SCROLL_MAX_STEP) * (overTop > overBottom ? -1 : 1);
+            if (listScrolls) {
+                list.scrollTop += distance;
+            } else {
+                window.scrollBy(0, distance);
+            }
+        };
+
         // The dragged row itself never leaves the DOM (its neighbours are moved
         // around it), otherwise the browser would end the drag.
         const moveTowards = (row, pointerY) => {
@@ -81,11 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let frame = null;
 
             const step = () => {
-                if (pointerY < EDGE_SCROLL_ZONE) {
-                    window.scrollBy(0, -EDGE_SCROLL_STEP);
-                } else if (pointerY > window.innerHeight - EDGE_SCROLL_ZONE) {
-                    window.scrollBy(0, EDGE_SCROLL_STEP);
-                }
+                scrollNearEdge(pointerY);
                 moveTowards(row, pointerY);
                 frame = requestAnimationFrame(step);
             };
@@ -128,9 +144,45 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
             list.insertBefore(row, event.key === 'ArrowUp' ? neighbour : neighbour.nextElementSibling);
             handle.focus();
+            row.scrollIntoView({block: 'nearest'});
             renumber();
             saveOrder();
         });
+    };
+
+    // Search field above a long list: hides the rows that do not match.
+    const initListFilters = () => {
+        document.querySelectorAll('[data-list-filter]').forEach(input => {
+            const rows = Array.from(document.querySelectorAll(`${input.dataset.listFilter} > [data-filter-text]`));
+            const count = input.parentNode.querySelector('[data-list-filter-count]');
+
+            const apply = () => {
+                const query = input.value.trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(row => {
+                    const matches = row.dataset.filterText.toLowerCase().includes(query);
+                    row.hidden = !matches;
+                    if (matches) visible++;
+                });
+                count.textContent = query ? `${visible} von ${rows.length}` : `${rows.length}`;
+            };
+
+            input.addEventListener('input', apply);
+            apply();
+        });
+    };
+
+    // Lists that scroll inside their panel get a fade at the bottom while
+    // there is more than fits (see .is-scrollable).
+    const initScrollCues = () => {
+        const lists = document.querySelectorAll('.slide-list, .content-grid, .user-list');
+        const mark = () => lists.forEach(list => {
+            list.classList.toggle('is-scrollable', list.scrollHeight > list.clientHeight + 1);
+        });
+
+        mark();
+        window.addEventListener('resize', mark);
+        document.querySelectorAll('[data-list-filter]').forEach(input => input.addEventListener('input', mark));
     };
 
     const initConfirmForms = () => {
@@ -267,20 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const initChoiceFilter = () => {
         document.querySelectorAll('.choice-list').forEach(list => {
             const items = Array.from(list.querySelectorAll('.form-check'));
-
-            // Compact chip layout for every list; toolbar only when it scales.
-            items.forEach(item => {
-                const label = item.querySelector('.form-check-label');
-                if (!label || item.querySelector('.choice-avatar')) return;
-                const name = label.textContent.trim();
-                if (!name) return;
-                const avatar = document.createElement('span');
-                avatar.className = 'choice-avatar';
-                avatar.setAttribute('aria-hidden', 'true');
-                const [firstWord, rest] = name.split(/ (.*)/);
-                avatar.textContent = (rest || firstWord).charAt(0).toUpperCase();
-                item.insertBefore(avatar, label);
-            });
 
             if (items.length < 6) return;
 
@@ -425,9 +463,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 preview.querySelectorAll('img').forEach(img => URL.revokeObjectURL(img.src));
                 preview.innerHTML = '';
 
+                // Every file gets a tile, also one that is no image: the upload
+                // loop reports its result on the tile with the same index.
                 Array.from(input.files).forEach((file, index) => {
-                    if (!file.type.startsWith('image/')) return;
-
+                    const isImage = file.type.startsWith('image/');
                     const tile = document.createElement('div');
                     tile.className = 'image-preview-tile';
 
@@ -436,10 +475,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const media = document.createElement('div');
                     media.className = 'image-preview-media';
 
-                    const img = document.createElement('img');
-                    img.className = 'thumbnail';
-                    img.src = URL.createObjectURL(file);
-                    media.appendChild(img);
+                    if (isImage) {
+                        const img = document.createElement('img');
+                        img.className = 'thumbnail';
+                        img.loading = 'lazy';
+                        img.decoding = 'async';
+                        img.src = URL.createObjectURL(file);
+                        media.appendChild(img);
+                    }
 
                     const removeButton = document.createElement('button');
                     removeButton.type = 'button';
@@ -450,7 +493,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     removeButton.addEventListener('click', () => removeFileAt(index));
                     media.appendChild(removeButton);
 
-                    if (file.size > MAX_ORIGINAL_BYTES) {
+                    if (!isImage) {
+                        tile.classList.add('is-rejected');
+                        tile.title = `${file.name} ist kein Bild`;
+
+                        const badge = document.createElement('span');
+                        badge.className = 'image-preview-badge is-error';
+                        badge.textContent = 'kein Bild';
+                        media.appendChild(badge);
+                    } else if (file.size > MAX_ORIGINAL_BYTES) {
                         tile.classList.add('is-rejected');
                         tile.title = `${file.name} ist größer als 25 MB und kann nicht hochgeladen werden`;
 
@@ -890,6 +941,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Run initializations
     initThemeToggle();
     initSortableList();
+    initListFilters();
+    initScrollCues();
     initConfirmForms();
     initWysiwyg();
     initBulkDelete();
