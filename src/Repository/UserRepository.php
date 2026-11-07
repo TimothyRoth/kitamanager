@@ -43,6 +43,18 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return list<string>
+     */
+    public function findAllDevicePins(): array
+    {
+        return $this->createQueryBuilder('u')
+            ->select('u.devicePin')
+            ->andWhere('u.devicePin IS NOT NULL')
+            ->getQuery()
+            ->getSingleColumnResult();
+    }
+
     public function getUsersByRole(string $role): array
     {
         $qb = $this->createQueryBuilder('u');

@@ -16,6 +16,7 @@ use App\Repository\SliderItemRepository;
 use App\Repository\UserRepository;
 use App\Security\Dashboard;
 use App\Service\AudienceSynchronizer;
+use App\Service\DevicePinAssigner;
 use App\Service\ImageDownscaleException;
 use App\Service\ImageDownscaler;
 use App\Service\ImageUploader;
@@ -195,6 +196,38 @@ final class ManagementController extends AbstractController
         } else {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
         }
+
+        return $this->redirectToRoute('app_management_admin');
+    }
+
+    #[Route('/admin/reset-device-pins', name: 'app_management_reset_device_pins', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function resetDevicePins(Request $request, UserRepository $userRepository, DevicePinAssigner $pinAssigner, EntityManagerInterface $entityManager): Response
+    {
+        if (!$this->isCsrfTokenValid('reset-device-pins', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Ungültiger CSRF-Token.');
+
+            return $this->redirectToRoute('app_management_admin');
+        }
+
+        $ids = $request->request->all('ids');
+        $kitas = [] === $ids ? [] : array_filter(
+            $userRepository->findBy(['id' => $ids]),
+            fn (User $user) => !$user->isAdmin(),
+        );
+
+        if ([] === $kitas) {
+            $this->addFlash('danger', 'Es wurden keine Kitas ausgewählt.');
+
+            return $this->redirectToRoute('app_management_admin');
+        }
+
+        $pinAssigner->assignNewPins($kitas);
+        $entityManager->flush();
+        $this->addFlash('success', sprintf(
+            '%d Kita(s) haben eine neue Fernseher-PIN erhalten. Bereits verbundene Fernseher zeigen wieder die PIN-Eingabe.',
+            count($kitas),
+        ));
 
         return $this->redirectToRoute('app_management_admin');
     }

@@ -257,36 +257,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // NOTE: The TV slider and PIN entry logic lives in tv.js (strictly ES5 for
     // embedded TV browsers); the /slider/... pages load tv.js instead of this file.
 
-    // Initialize bulk-delete selection
-    const initBulkDelete = () => {
-        const submitButton = document.querySelector('[data-bulk-submit]');
-        if (!submitButton) return;
+    // Bulk actions (delete contents, reset PINs): the entries' checkboxes
+    // belong to the bulk form through their "form" attribute. Entries hidden
+    // by a list filter are never part of the selection.
+    const initBulkActions = () => {
+        document.querySelectorAll('[data-bulk-submit]').forEach(submitButton => {
+            const form = submitButton.form;
+            const checkboxes = Array.from(document.querySelectorAll(`.bulk-checkbox[form="${form.id}"]`));
+            const selectAll = form.closest('.bulk-bar').querySelector('[data-bulk-select-all]');
+            const visibleCheckboxes = () => checkboxes.filter(cb => !cb.closest('[hidden]'));
 
-        const checkboxes = Array.from(document.querySelectorAll('.bulk-checkbox'));
-        const selectAll = document.querySelector('[data-bulk-select-all]');
-
-        const refresh = () => {
-            const anyChecked = checkboxes.some(cb => cb.checked);
-            submitButton.disabled = !anyChecked;
-
-            if (selectAll) {
-                const allChecked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+            const refresh = () => {
+                const visible = visibleCheckboxes();
+                const anyChecked = visible.some(cb => cb.checked);
+                const allChecked = visible.length > 0 && visible.every(cb => cb.checked);
+                submitButton.disabled = !anyChecked;
                 selectAll.checked = allChecked;
                 selectAll.indeterminate = anyChecked && !allChecked;
-            }
-        };
+            };
 
-        if (selectAll) {
             selectAll.addEventListener('change', () => {
-                checkboxes.forEach(cb => {
+                visibleCheckboxes().forEach(cb => {
                     cb.checked = selectAll.checked;
                 });
                 refresh();
             });
-        }
-
-        checkboxes.forEach(cb => cb.addEventListener('change', refresh));
-        refresh();
+            checkboxes.forEach(cb => cb.addEventListener('change', refresh));
+            document.querySelectorAll('[data-list-filter]').forEach(input => input.addEventListener('input', () => {
+                checkboxes.filter(cb => cb.closest('[hidden]')).forEach(cb => {
+                    cb.checked = false;
+                });
+                refresh();
+            }));
+            refresh();
+        });
     };
 
     // Hide the per-user selection list while an "all users" checkbox is active,
@@ -945,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initScrollCues();
     initConfirmForms();
     initWysiwyg();
-    initBulkDelete();
+    initBulkActions();
     initImagePreview();
     initUploadProgress();
     initChoiceFilter();
