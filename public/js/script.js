@@ -185,10 +185,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-list-filter]').forEach(input => input.addEventListener('input', mark));
     };
 
+    // The question sits on the form or, when a form has several actions, on
+    // the button that was pressed.
     const initConfirmForms = () => {
-        document.querySelectorAll('form[data-confirm]').forEach(form => {
+        document.querySelectorAll('form[data-confirm], form:has(button[data-confirm])').forEach(form => {
             form.addEventListener('submit', (e) => {
-                if (!confirm(form.getAttribute('data-confirm'))) {
+                const question = (e.submitter && e.submitter.dataset.confirm) || form.dataset.confirm;
+                if (question && !confirm(question)) {
                     e.preventDefault();
                 }
             });
@@ -257,12 +260,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // NOTE: The TV slider and PIN entry logic lives in tv.js (strictly ES5 for
     // embedded TV browsers); the /slider/... pages load tv.js instead of this file.
 
-    // Bulk actions (delete contents, reset PINs): the entries' checkboxes
-    // belong to the bulk form through their "form" attribute. Entries hidden
-    // by a list filter are never part of the selection.
+    // Bulk actions (delete contents, reset PINs, delete Kitas): the entries'
+    // checkboxes belong to the bulk form through their "form" attribute; the
+    // form's buttons wake up once something is ticked. Entries hidden by a
+    // list filter are never part of the selection.
     const initBulkActions = () => {
-        document.querySelectorAll('[data-bulk-submit]').forEach(submitButton => {
-            const form = submitButton.form;
+        document.querySelectorAll('.bulk-bar form').forEach(form => {
+            const actions = Array.from(form.querySelectorAll('[data-bulk-submit]'));
             const checkboxes = Array.from(document.querySelectorAll(`.bulk-checkbox[form="${form.id}"]`));
             const selectAll = form.closest('.bulk-bar').querySelector('[data-bulk-select-all]');
             const visibleCheckboxes = () => checkboxes.filter(cb => !cb.closest('[hidden]'));
@@ -271,7 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const visible = visibleCheckboxes();
                 const anyChecked = visible.some(cb => cb.checked);
                 const allChecked = visible.length > 0 && visible.every(cb => cb.checked);
-                submitButton.disabled = !anyChecked;
+                actions.forEach(action => {
+                    action.disabled = !anyChecked;
+                });
                 selectAll.checked = allChecked;
                 selectAll.indeterminate = anyChecked && !allChecked;
             };

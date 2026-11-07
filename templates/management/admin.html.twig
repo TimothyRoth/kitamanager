@@ -65,17 +65,21 @@
                             <input type="checkbox" data-bulk-select-all>
                             <span>Alle auswählen</span>
                         </label>
-                        <form id="resetPinsForm" method="post" action="{{ path('app_management_reset_device_pins') }}"
-                              data-confirm="Den ausgewählten Kitas neue Fernseher-PINs geben? Bereits verbundene Fernseher verlieren ihre Zuordnung und müssen mit der neuen PIN verbunden werden.">
-                            <input type="hidden" name="_token" value="{{ csrf_token('reset-device-pins') }}">
-                            <button type="submit" class="btn btn-secondary" data-bulk-submit disabled>{{ icons.icon('tv') }} Neue PINs vergeben</button>
+                        {# Each button names its own action and carries its own CSRF token. #}
+                        <form id="kitaSelectionForm" method="post">
+                            <button type="submit" class="btn btn-secondary" data-bulk-submit disabled
+                                    formaction="{{ path('app_management_reset_device_pins') }}" name="_token" value="{{ csrf_token('reset-device-pins') }}"
+                                    data-confirm="Den ausgewählten Kitas neue Fernseher-PINs geben? Bereits verbundene Fernseher verlieren ihre Zuordnung und müssen mit der neuen PIN verbunden werden.">{{ icons.icon('tv') }} Neue PINs vergeben</button>
+                            <button type="submit" class="btn btn-danger" data-bulk-submit disabled
+                                    formaction="{{ path('app_management_delete_users') }}" name="_token" value="{{ csrf_token('delete-users') }}"
+                                    data-confirm="Die ausgewählten Kitas mitsamt all ihrer Beiträge endgültig löschen? Das lässt sich nicht rückgängig machen.">{{ icons.icon('trash') }} Ausgewählte löschen</button>
                         </form>
                     </div>
                     <ul class="user-list" id="kita-list">
                         {% for user in users %}
                             <li class="user-row" data-filter-text="{{ user.username }}">
                                 <label class="user-row-select">
-                                    <input type="checkbox" class="bulk-checkbox" name="ids[]" value="{{ user.id }}" form="resetPinsForm">
+                                    <input type="checkbox" class="bulk-checkbox" name="ids[]" value="{{ user.id }}" form="kitaSelectionForm">
                                     <span class="sr-only">{{ user.username }} auswählen</span>
                                 </label>
                                 <div class="user-row-text">

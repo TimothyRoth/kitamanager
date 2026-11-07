@@ -173,6 +173,7 @@ classDiagram
 - [ ] Admin kann in der Kita-Liste mehrere Kitas ankreuzen und ihnen mit "Neue PINs vergeben" zufällige, systemweit eindeutige PINs geben (nach Rückfrage). Ausgefilterte Kitas sind nie Teil der Auswahl.
 - [ ] Admin kann einer Kita "Zugewiesene Kitas" geben oder "Allen Kitas zuweisen" aktivieren.
 - [ ] Admin kann Kita löschen; deren Inhalte, Slider-Einträge und Zuweisungen (als Ersteller wie als Ziel) verschwinden.
+- [ ] Admin kann mehrere angekreuzte Kitas mit "Ausgewählte löschen" auf einmal löschen (nach Rückfrage); Admin-Konten in der Auswahl werden übergangen.
 - [ ] Admin-Konten lassen sich nicht löschen.
 
 ### Inhalte & Zuweisung
