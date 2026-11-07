@@ -17,8 +17,10 @@
 
 .app-bar-brand {
     display: inline-flex;
+    flex: none;
     align-items: center;
     gap: var(--space-3);
+    white-space: nowrap;
     font-weight: 700;
     font-size: 1.0625rem;
     letter-spacing: -0.01em;
@@ -43,13 +45,19 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    min-width: 0;
 }
 
+/* The name is the only part of the bar that may give way to a long Kita name. */
 .app-bar-user {
+    min-width: 0;
     margin-right: var(--space-2);
+    overflow: hidden;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .page {
@@ -302,16 +310,24 @@
     box-shadow: var(--shadow-md);
 }
 
+/* The hero greets with the name, so the bar drops it first, then the button texts. */
+@media (max-width: 52rem) {
+    .app-bar-user {
+        display: none;
+    }
+}
+
+@media (max-width: 40rem) {
+    .btn-text-optional {
+        display: none;
+    }
+}
+
 @media (max-width: 35rem) {
     .app-bar,
     .page {
         padding-left: max(var(--space-4), env(safe-area-inset-left));
         padding-right: max(var(--space-4), env(safe-area-inset-right));
-    }
-
-    .app-bar-user,
-    .btn-text-optional {
-        display: none;
     }
 
     .panel {

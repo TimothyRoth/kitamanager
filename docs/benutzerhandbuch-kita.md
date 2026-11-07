@@ -34,7 +34,7 @@ Nach der Anmeldung sehen Sie Ihr Dashboard. Von oben nach unten:
 
 | Bereich | Was Sie dort tun |
 |---|---|
-| **Kopfzeile** | Ihr Name, Sprung zu den Einstellungen, Umschalter hell/dunkel, **Abmelden** |
+| **Kopfzeile** | Ihr Name, **Anleitung** (dieses Dokument als PDF), Sprung zu den Einstellungen, Umschalter hell/dunkel, **Abmelden** |
 | **Schnellaktionen** | **Fotos hinzufügen**, **Artikel schreiben**, **Vorschau** |
 | **Mein Slider** | Das, was Ihr Fernseher zeigt – in genau dieser Reihenfolge |
 | **Meine Inhalte** | Alles, was Sie selbst erstellt haben – hier bearbeiten und löschen |

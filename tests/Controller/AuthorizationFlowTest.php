@@ -189,6 +189,27 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertSelectorTextContains('.app-bar-user', 'kita-a');
     }
 
+    public function testKitaCanDownloadTheManualFromTheHeader(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user');
+        $link = $crawler->filter('.app-bar a[href$="/management/user/manual"]');
+        self::assertCount(1, $link);
+
+        $this->client->click($link->link());
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('Content-Type', 'application/pdf');
+        self::assertStringContainsString('attachment', $this->client->getResponse()->headers->get('Content-Disposition'));
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        self::assertCount(0, $crawler->filter('.app-bar a[href$="/management/user/manual"]'));
+
+        $this->client->restart();
+        $this->client->request('GET', '/management/user/manual');
+        self::assertResponseRedirects('http://localhost/admin');
+    }
+
     public function testKitaCannotAccessAdminDashboard(): void
     {
         $this->client->loginUser($this->kitaA);

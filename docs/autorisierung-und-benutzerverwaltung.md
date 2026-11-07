@@ -157,6 +157,7 @@ classDiagram
 - [ ] Wer bereits angemeldet ist und `/admin` aufruft, landet direkt im eigenen Dashboard.
 - [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
+- [ ] Eine Kita kann über "Anleitung" in der Kopfzeile das Benutzerhandbuch als PDF herunterladen; der Admin sieht den Link nicht, ohne Anmeldung führt die Adresse zur Anmeldung.
 - [ ] Logout beendet die Sitzung.
 - [ ] Mit "Angemeldet bleiben" bleibt die Anmeldung 30 Tage bestehen, auch nach dem Schließen des Browsers; ohne den Haken endet sie mit der Sitzung.
 - [ ] Passwortfelder lassen sich über das Augen-Symbol im Klartext anzeigen und wieder verbergen.

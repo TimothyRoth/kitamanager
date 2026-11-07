@@ -29,6 +29,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -124,6 +126,12 @@ final class ManagementController extends AbstractController
             'durationForm' => $durationForm->createView(),
             'passwordForm' => $passwordForm->createView(),
         ], new Response(null, $this->statusFor($durationForm, $passwordForm)));
+    }
+
+    #[Route('/user/manual', name: 'app_management_manual')]
+    public function manual(#[Autowire('%kernel.project_dir%/docs/benutzerhandbuch-kita.pdf')] string $manualPath): BinaryFileResponse
+    {
+        return $this->file($manualPath, 'Kita-Manager-Anleitung.pdf');
     }
 
     #[Route('/admin/edit-user/{id}', name: 'app_management_edit_user')]
