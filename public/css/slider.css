@@ -130,9 +130,9 @@
     color: #64748b;
 }
 
-/* Subtle but readable PIN marker – bottom-right, above slide content,
+/* Subtle but readable Kita name – bottom-right, above slide content,
    outside the refreshed slide markup so auto-refresh never removes it. */
-.tv-pin-watermark {
+.tv-watermark {
     position: fixed;
     right: 1.5vw;
     bottom: 1.5vh;
@@ -141,7 +141,7 @@
     font-family: system-ui, -apple-system, sans-serif;
     font-size: 2.2vh;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em;
     color: rgba(255, 255, 255, 0.72);
     background: rgba(0, 0, 0, 0.38);
     border: 1px solid rgba(255, 255, 255, 0.22);

@@ -661,8 +661,8 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseRedirects('/slider/kita-a');
         $this->client->followRedirect();
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.tv-pin-watermark');
-        self::assertSelectorTextContains('.tv-pin-watermark', '1111');
+        self::assertSelectorExists('.tv-watermark');
+        self::assertSelectorTextContains('.tv-watermark', 'kita-a');
     }
 
     public function testAdminSeesPinReachabilityOnEditUser(): void

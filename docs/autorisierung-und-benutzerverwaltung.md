@@ -194,7 +194,7 @@ classDiagram
 - [ ] Ein bereits gekoppeltes Gerät landet beim erneuten Aufruf von `/slider/display` direkt im Slider.
 - [ ] Falsche PIN wird abgelehnt.
 - [ ] Ändert/entfernt der Admin die PIN, zeigt das gekoppelte TV wieder die PIN-Eingabe ("unlinked").
-- [ ] Slider zeigt ein erkennbares PIN-Wasserzeichen, wenn eine Geräte-PIN gesetzt ist.
+- [ ] Slider zeigt unten rechts den Namen der Kita, deren Inhalte laufen (nicht die PIN).
 - [ ] Admin sieht in der Benutzerliste und beim Bearbeiten, ob/mit welcher PIN der Slider erreichbar ist.
 - [ ] Neue/aktivierte Inhalte erscheinen ohne Neuladen auf dem TV (regelmäßige Abfrage).
 - [ ] Wird eine Kita umbenannt, zeigen ihre gekoppelten Fernseher weiter ihre Inhalte.
