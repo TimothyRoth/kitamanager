@@ -11,6 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -137,6 +138,11 @@ final class AuthorizationFlowTest extends AppWebTestCase
             'SELECT COUNT(*) FROM user_publish_target WHERE source_user_id = :id OR target_user_id = :id',
             ['id' => $userId]
         );
+    }
+
+    private function kitaSelectionToken(Crawler $adminDashboard, string $tokenId): string
+    {
+        return $adminDashboard->filter(sprintf('form#kitaSelectionForm button[formaction$="/%s"]', $tokenId))->attr('value');
     }
 
     private function loginForm(string $username, string $password): void
@@ -358,7 +364,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $this->client->loginUser($this->admin);
         $crawler = $this->client->request('GET', '/management/admin');
         $this->client->request('POST', '/management/admin/reset-device-pins', [
-            '_token' => $crawler->filter('form#resetPinsForm input[name="_token"]')->attr('value'),
+            '_token' => $this->kitaSelectionToken($crawler, 'reset-device-pins'),
             'ids' => [$this->kitaA->getId(), $this->kitaC->getId()],
         ]);
         self::assertResponseRedirects('/management/admin');
@@ -382,12 +388,45 @@ final class AuthorizationFlowTest extends AppWebTestCase
     {
         $this->client->loginUser($this->admin);
         $crawler = $this->client->request('GET', '/management/admin');
-        $this->client->submit($crawler->filter('form#resetPinsForm')->form());
+        $this->client->request('POST', '/management/admin/reset-device-pins', [
+            '_token' => $this->kitaSelectionToken($crawler, 'reset-device-pins'),
+        ]);
         $this->client->followRedirect();
         self::assertSelectorTextContains('.alert-danger', 'keine Kitas ausgewählt');
 
         $this->em->clear();
         self::assertSame('1111', $this->em->getRepository(User::class)->find($this->kitaA->getId())->getDevicePin());
+    }
+
+    public function testAdminCanDeleteSelectedKitasAtOnce(): void
+    {
+        $content = $this->createArticle($this->kitaC, 'Verschwindet mit der Kita');
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+
+        $this->client->request('POST', '/management/admin/delete-users', [
+            '_token' => $this->kitaSelectionToken($crawler, 'delete-users'),
+            'ids' => [$this->kitaB->getId(), $this->kitaC->getId(), $this->admin->getId()],
+        ]);
+        self::assertResponseRedirects('/management/admin');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-success', '2 Kita(s)');
+
+        $this->em->clear();
+        $users = $this->em->getRepository(User::class);
+        self::assertNull($users->find($this->kitaB->getId()));
+        self::assertNull($users->find($this->kitaC->getId()));
+        self::assertNotNull($users->find($this->kitaA->getId()));
+        self::assertNotNull($users->find($this->admin->getId()), 'admin accounts are skipped');
+        self::assertNull($this->em->getRepository(Content::class)->find($content->getId()));
+    }
+
+    public function testKitaCannotDeleteKitas(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->client->request('POST', '/management/admin/delete-users', ['ids' => [$this->kitaB->getId()]]);
+
+        self::assertResponseStatusCodeSame(403);
     }
 
     public function testKitaCannotResetPins(): void

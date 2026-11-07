@@ -218,12 +218,7 @@ final class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_admin');
         }
 
-        $ids = $request->request->all('ids');
-        $kitas = [] === $ids ? [] : array_filter(
-            $userRepository->findBy(['id' => $ids]),
-            fn (User $user) => !$user->isAdmin(),
-        );
-
+        $kitas = $this->selectedKitas($request, $userRepository);
         if ([] === $kitas) {
             $this->addFlash('danger', 'Es wurden keine Kitas ausgewählt.');
 
@@ -238,6 +233,50 @@ final class ManagementController extends AbstractController
         ));
 
         return $this->redirectToRoute('app_management_admin');
+    }
+
+    #[Route('/admin/delete-users', name: 'app_management_delete_users', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function deleteUsers(Request $request, UserRepository $userRepository, EntityManagerInterface $entityManager): Response
+    {
+        if (!$this->isCsrfTokenValid('delete-users', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Ungültiger CSRF-Token.');
+
+            return $this->redirectToRoute('app_management_admin');
+        }
+
+        $kitas = $this->selectedKitas($request, $userRepository);
+        if ([] === $kitas) {
+            $this->addFlash('danger', 'Es wurden keine Kitas ausgewählt.');
+
+            return $this->redirectToRoute('app_management_admin');
+        }
+
+        foreach ($kitas as $kita) {
+            $entityManager->remove($kita);
+        }
+        $entityManager->flush();
+        $this->addFlash('success', sprintf('%d Kita(s) wurden mitsamt all ihrer Beiträge gelöscht.', count($kitas)));
+
+        return $this->redirectToRoute('app_management_admin');
+    }
+
+    /**
+     * The Kitas ticked in the admin's list; admin accounts are never part of a selection.
+     *
+     * @return list<User>
+     */
+    private function selectedKitas(Request $request, UserRepository $userRepository): array
+    {
+        $ids = $request->request->all('ids');
+        if ([] === $ids) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $userRepository->findBy(['id' => $ids]),
+            fn (User $user) => !$user->isAdmin(),
+        ));
     }
 
     #[Route('/user/create-image', name: 'app_management_create_image')]

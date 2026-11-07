@@ -163,12 +163,27 @@
 }
 
 .bulk-bar form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     margin: 0;
 }
 
 /* The action button only shows up once something is selected. */
 .bulk-bar [data-bulk-submit]:disabled {
     visibility: hidden;
+}
+
+/* On a phone the actions get a row of their own: side by side when both fit,
+   otherwise each as wide as the row. */
+@media (max-width: 40rem) {
+    .bulk-bar form {
+        flex: 1 1 100%;
+    }
+
+    .bulk-bar form .btn {
+        flex: 1 1 auto;
+    }
 }
 
 .content-grid {
