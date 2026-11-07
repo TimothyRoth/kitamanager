@@ -60,9 +60,24 @@
                             <span class="list-filter-count" data-list-filter-count></span>
                         </div>
                     {% endif %}
+                    <div class="bulk-bar">
+                        <label class="checkbox-label">
+                            <input type="checkbox" data-bulk-select-all>
+                            <span>Alle auswählen</span>
+                        </label>
+                        <form id="resetPinsForm" method="post" action="{{ path('app_management_reset_device_pins') }}"
+                              data-confirm="Den ausgewählten Kitas neue Fernseher-PINs geben? Bereits verbundene Fernseher verlieren ihre Zuordnung und müssen mit der neuen PIN verbunden werden.">
+                            <input type="hidden" name="_token" value="{{ csrf_token('reset-device-pins') }}">
+                            <button type="submit" class="btn btn-secondary" data-bulk-submit disabled>{{ icons.icon('tv') }} Neue PINs vergeben</button>
+                        </form>
+                    </div>
                     <ul class="user-list" id="kita-list">
                         {% for user in users %}
                             <li class="user-row" data-filter-text="{{ user.username }}">
+                                <label class="user-row-select">
+                                    <input type="checkbox" class="bulk-checkbox" name="ids[]" value="{{ user.id }}" form="resetPinsForm">
+                                    <span class="sr-only">{{ user.username }} auswählen</span>
+                                </label>
                                 <div class="user-row-text">
                                     <span class="user-row-name">{{ user.username }}</span>
                                     {% if user.devicePin %}

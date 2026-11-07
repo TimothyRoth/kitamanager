@@ -153,6 +153,7 @@ classDiagram
 ### Login & Rollen
 - [ ] Login mit falschen Daten schlägt fehl, Fehlermeldung erscheint.
 - [ ] Admin landet nach Login auf `/management/admin`, Kita auf `/management/user`.
+- [ ] Groß-/Kleinschreibung des Benutzernamens spielt beim Login keine Rolle (`KITA-A` meldet `kita-a` an).
 - [ ] Wer bereits angemeldet ist und `/admin` aufruft, landet direkt im eigenen Dashboard.
 - [ ] Kita kann `/management/admin` nicht aufrufen (403 Access Denied).
 - [ ] Admin wird von `/management/user` auf das Admin-Dashboard umgeleitet.
@@ -168,6 +169,7 @@ classDiagram
 - [ ] Admin kann Passwort einer Kita ändern.
 - [ ] Admin kann das eigene Passwort im Dashboard ändern (aktuelles Passwort erforderlich).
 - [ ] Admin kann einer Kita eine 4-stellige Geräte-PIN zuweisen; PIN muss eindeutig sein.
+- [ ] Admin kann in der Kita-Liste mehrere Kitas ankreuzen und ihnen mit "Neue PINs vergeben" zufällige, systemweit eindeutige PINs geben (nach Rückfrage). Ausgefilterte Kitas sind nie Teil der Auswahl.
 - [ ] Admin kann einer Kita "Zugewiesene Kitas" geben oder "Allen Kitas zuweisen" aktivieren.
 - [ ] Admin kann Kita löschen; deren Inhalte, Slider-Einträge und Zuweisungen (als Ersteller wie als Ziel) verschwinden.
 - [ ] Admin-Konten lassen sich nicht löschen.
@@ -194,7 +196,7 @@ classDiagram
 - [ ] Ein bereits gekoppeltes Gerät landet beim erneuten Aufruf von `/slider/display` direkt im Slider.
 - [ ] Falsche PIN wird abgelehnt.
 - [ ] Ändert/entfernt der Admin die PIN, zeigt das gekoppelte TV wieder die PIN-Eingabe ("unlinked").
-- [ ] Slider zeigt ein erkennbares PIN-Wasserzeichen, wenn eine Geräte-PIN gesetzt ist.
+- [ ] Slider zeigt unten rechts den Namen der Kita, deren Inhalte laufen (nicht die PIN).
 - [ ] Admin sieht in der Benutzerliste und beim Bearbeiten, ob/mit welcher PIN der Slider erreichbar ist.
 - [ ] Neue/aktivierte Inhalte erscheinen ohne Neuladen auf dem TV (regelmäßige Abfrage).
 - [ ] Wird eine Kita umbenannt, zeigen ihre gekoppelten Fernseher weiter ihre Inhalte.

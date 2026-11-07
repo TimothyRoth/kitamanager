@@ -180,6 +180,15 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    public function testLoginIgnoresTheCaseOfTheUsername(): void
+    {
+        $this->loginForm('KITA-A', 'kita-a-secret');
+
+        self::assertResponseRedirects('/management/user');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.app-bar-user', 'kita-a');
+    }
+
     public function testKitaCannotAccessAdminDashboard(): void
     {
         $this->client->loginUser($this->kitaA);
@@ -321,6 +330,51 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $this->client->submit($pinForm);
         $this->client->followRedirect();
         self::assertSelectorExists('.alert-danger');
+    }
+
+    public function testAdminCanGiveSelectedKitasNewUniquePins(): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $this->client->request('POST', '/management/admin/reset-device-pins', [
+            '_token' => $crawler->filter('form#resetPinsForm input[name="_token"]')->attr('value'),
+            'ids' => [$this->kitaA->getId(), $this->kitaC->getId()],
+        ]);
+        self::assertResponseRedirects('/management/admin');
+
+        $this->em->clear();
+        $kitaA = $this->em->getRepository(User::class)->find($this->kitaA->getId());
+        $kitaB = $this->em->getRepository(User::class)->find($this->kitaB->getId());
+        $kitaC = $this->em->getRepository(User::class)->find($this->kitaC->getId());
+
+        self::assertMatchesRegularExpression('/^\d{4}$/', $kitaA->getDevicePin());
+        self::assertNotSame('1111', $kitaA->getDevicePin());
+        self::assertMatchesRegularExpression('/^\d{4}$/', $kitaC->getDevicePin());
+        self::assertSame('2222', $kitaB->getDevicePin(), 'unselected Kitas keep their PIN');
+        self::assertCount(3, array_unique([$kitaA->getDevicePin(), $kitaB->getDevicePin(), $kitaC->getDevicePin()]));
+
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-success', '2 Kita(s)');
+    }
+
+    public function testResettingPinsWithoutASelectionChangesNothing(): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $this->client->submit($crawler->filter('form#resetPinsForm')->form());
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', 'keine Kitas ausgewählt');
+
+        $this->em->clear();
+        self::assertSame('1111', $this->em->getRepository(User::class)->find($this->kitaA->getId())->getDevicePin());
+    }
+
+    public function testKitaCannotResetPins(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->client->request('POST', '/management/admin/reset-device-pins', ['ids' => [$this->kitaB->getId()]]);
+
+        self::assertResponseStatusCodeSame(403);
     }
 
     public function testAdminCanAssignPublishTargetsAndPublishToAll(): void
@@ -661,8 +715,8 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseRedirects('/slider/kita-a');
         $this->client->followRedirect();
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.tv-pin-watermark');
-        self::assertSelectorTextContains('.tv-pin-watermark', '1111');
+        self::assertSelectorExists('.tv-watermark');
+        self::assertSelectorTextContains('.tv-watermark', 'kita-a');
     }
 
     public function testAdminSeesPinReachabilityOnEditUser(): void
