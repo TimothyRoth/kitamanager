@@ -180,6 +180,15 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    public function testLoginIgnoresTheCaseOfTheUsername(): void
+    {
+        $this->loginForm('KITA-A', 'kita-a-secret');
+
+        self::assertResponseRedirects('/management/user');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.app-bar-user', 'kita-a');
+    }
+
     public function testKitaCannotAccessAdminDashboard(): void
     {
         $this->client->loginUser($this->kitaA);
