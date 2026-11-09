@@ -350,7 +350,7 @@ final class ManagementController extends AbstractController
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
             'page_title' => 'Neue Fotos hinzufügen',
-        ]);
+        ], new Response(null, $this->statusFor($form)));
     }
 
     /**
@@ -508,7 +508,7 @@ final class ManagementController extends AbstractController
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
             'page_title' => 'Neuen Artikel erstellen',
-        ]);
+        ], new Response(null, $this->statusFor($form)));
     }
 
     #[Route('/user/edit-content/{id}', name: 'app_management_edit_content')]
@@ -575,7 +575,7 @@ final class ManagementController extends AbstractController
             'form' => $form->createView(),
             'page_title' => $isArticle ? 'Artikel bearbeiten' : 'Bild bearbeiten',
             'content' => $content,
-        ]);
+        ], new Response(null, $this->statusFor($form)));
     }
 
     #[Route('/user/delete-content/{id}', name: 'app_management_delete_content', methods: ['POST'])]

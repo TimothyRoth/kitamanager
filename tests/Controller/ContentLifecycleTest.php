@@ -164,10 +164,39 @@ final class ContentLifecycleTest extends AppWebTestCase
         $form['content[imageFile]']->upload($uploadPath);
 
         $this->client->submit($form);
-        // createArticle re-renders without an explicit 422; errors must still show.
-        self::assertResponseIsSuccessful();
+        self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('body', 'Titel');
         self::assertNull($this->em->getRepository(Content::class)->findOneBy(['title' => '']));
+    }
+
+    public function testPhotoFormRejectsAFileThatIsNoImage(): void
+    {
+        $notAnImage = $this->tmpDir . '/notes.txt';
+        file_put_contents($notAnImage, 'not an image');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-image');
+        $form = $crawler->selectButton('Fotos hochladen')->form();
+        $form['content[imageFile][0]']->upload($notAnImage);
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.form-errors', 'Bitte laden Sie ein gültiges Bild hoch');
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testEditingAnArticleRequiresATitle(): void
+    {
+        $article = $this->seedArticle($this->kitaA, 'Bleibt');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $form = $crawler->selectButton('Änderungen speichern')->form(['content[title]' => '']);
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        $this->em->clear();
+        self::assertSame('Bleibt', $this->em->getRepository(Content::class)->find($article->getId())->getTitle());
     }
 
     private const UNSAFE_ARTICLE_TEXT = '<h2>Sommerfest</h2><p>Am <strong>Freitag</strong> ab <em>15 Uhr</em></p>'
