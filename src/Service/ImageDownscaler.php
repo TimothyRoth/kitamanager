@@ -49,6 +49,22 @@ class ImageDownscaler
     }
 
     /**
+     * @return bool whether the file had to be changed
+     *
+     * @throws ImageDownscaleException with a user-facing German message
+     */
+    public function prepareForTvIfNeeded(string $path): bool
+    {
+        if (!$this->needsTvPreparation($path)) {
+            return false;
+        }
+
+        $this->prepareForTv($path);
+
+        return true;
+    }
+
+    /**
      * Downscale the image at $path in place until it is <= MAX_BYTES.
      * The file may change format (PNG photos are re-encoded as JPEG unless
      * they use transparency); callers that derive the file extension from

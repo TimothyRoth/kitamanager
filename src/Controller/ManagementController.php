@@ -16,6 +16,7 @@ use App\Repository\SliderItemRepository;
 use App\Repository\UserRepository;
 use App\Security\Dashboard;
 use App\Service\AudienceSynchronizer;
+use App\Service\ContentPublisher;
 use App\Service\DevicePinAssigner;
 use App\Service\ImageDownscaleException;
 use App\Service\ImageDownscaler;
@@ -281,7 +282,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-image', name: 'app_management_create_image')]
-    public function createImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function createImage(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB pro Bild – bitte laden Sie weniger Bilder gleichzeitig hoch.');
@@ -307,38 +308,29 @@ final class ManagementController extends AbstractController
             $imageFiles = $form->get('imageFile')->getData();
             ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
 
-            $created = [];
+            $storedCount = 0;
             $failed = [];
             foreach ($imageFiles as $imageFile) {
                 // No-JS fallback path: downscale oversized images here as well.
-                if ($imageDownscaler->needsTvPreparation($imageFile->getPathname())) {
-                    try {
-                        $imageDownscaler->prepareForTv($imageFile->getPathname());
-                    } catch (ImageDownscaleException $e) {
-                        $failed[] = $imageFile->getClientOriginalName() . ': ' . $e->getMessage();
-                        continue;
-                    }
+                try {
+                    $imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
+                } catch (ImageDownscaleException $e) {
+                    $failed[] = $imageFile->getClientOriginalName() . ': ' . $e->getMessage();
+                    continue;
                 }
 
                 // Each photo is stored completely before the next one starts,
                 // so a failure leaves nothing half-stored behind it.
                 try {
-                    $image = new Content();
-                    $image->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
-                    $image->setType(eContentType::IMAGE);
-                    $image->setCreator($creator);
-                    $entityManager->persist($image);
-                    $entityManager->flush();
-
-                    $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
-                    $entityManager->flush();
+                    $image = (new Content())->setType(eContentType::IMAGE)->setCreator($creator);
+                    $contentPublisher->publish($image, $imageFile, $audienceIds, $audienceAll);
                 } catch (\Exception $e) {
                     $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
                     $failed[] = self::IMAGE_NOT_STORED;
                     break;
                 }
 
-                $created[] = $image;
+                $storedCount++;
                 $this->rememberUploadedImage();
             }
 
@@ -346,7 +338,7 @@ final class ManagementController extends AbstractController
                 $this->addFlash('danger', $failure);
             }
 
-            if ($created) {
+            if ($storedCount > 0) {
                 return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
 
@@ -367,7 +359,7 @@ final class ManagementController extends AbstractController
      */
     #[Route('/user/upload-image', name: 'app_management_upload_image', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function uploadImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): JsonResponse
+    public function uploadImage(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, LoggerInterface $logger): JsonResponse
     {
         // Body exceeded post_max_size: PHP dropped the whole request payload.
         if ($this->isTruncatedUpload($request)) {
@@ -403,14 +395,10 @@ final class ManagementController extends AbstractController
             return $this->uploadError('Bitte laden Sie ein gültiges Bild hoch (JPEG, PNG, GIF).');
         }
 
-        $downscaled = false;
-        if ($imageDownscaler->needsTvPreparation($file->getPathname())) {
-            try {
-                $imageDownscaler->prepareForTv($file->getPathname());
-                $downscaled = true;
-            } catch (ImageDownscaleException $e) {
-                return $this->uploadError($e->getMessage());
-            }
+        try {
+            $downscaled = $imageDownscaler->prepareForTvIfNeeded($file->getPathname());
+        } catch (ImageDownscaleException $e) {
+            return $this->uploadError($e->getMessage());
         }
 
         /** @var User $creator */
@@ -420,16 +408,8 @@ final class ManagementController extends AbstractController
         $audienceIds = array_map('intval', $request->request->all('audience'));
 
         try {
-            $image = new Content();
-            $image->setImageUrl($imageUploader->upload($file, $creator->getId()));
-            $image->setType(eContentType::IMAGE);
-            $image->setCreator($creator);
-            $entityManager->persist($image);
-            $entityManager->flush();
-
-            // Invalid/forbidden audience ids are filtered inside the synchronizer.
-            $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
-            $entityManager->flush();
+            $image = (new Content())->setType(eContentType::IMAGE)->setCreator($creator);
+            $contentPublisher->publish($image, $file, $audienceIds, $audienceAll);
         } catch (\Exception $e) {
             $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
 
@@ -462,12 +442,8 @@ final class ManagementController extends AbstractController
      */
     private function downscaleOrAddError(ImageDownscaler $imageDownscaler, UploadedFile $imageFile, FormInterface $form): bool
     {
-        if (!$imageDownscaler->needsTvPreparation($imageFile->getPathname())) {
-            return true;
-        }
-
         try {
-            $imageDownscaler->prepareForTv($imageFile->getPathname());
+            $imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
 
             return true;
         } catch (ImageDownscaleException $e) {
@@ -478,7 +454,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-article', name: 'app_management_create_article')]
-    public function createArticle(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function createArticle(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB für das Bild.');
@@ -504,18 +480,10 @@ final class ManagementController extends AbstractController
 
             if ($this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
                 try {
-                    $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
-
-                    $content->setImageUrl($imageUrl);
                     $content->setType(eContentType::ARTICLE);
                     $content->setCreator($creator);
-
-                    $entityManager->persist($content);
-                    $entityManager->flush();
-
                     ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                    $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
-                    $entityManager->flush();
+                    $contentPublisher->publish($content, $imageFile, $audienceIds, $audienceAll);
 
                     $this->addFlash('success', 'Artikel erfolgreich erstellt!');
 
