@@ -334,6 +334,34 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertSame('1111', $this->em->getRepository(User::class)->find($this->kitaA->getId())->getDevicePin());
     }
 
+    public function testAdminCanGiveOneKitaARandomUniquePin(): void
+    {
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin/edit-user/' . $this->kitaA->getId());
+        $this->client->submit($crawler->selectButton('Zufällige PIN vergeben')->form());
+        self::assertResponseRedirects('/management/admin/edit-user/' . $this->kitaA->getId());
+
+        $this->em->clear();
+        $pin = $this->em->getRepository(User::class)->find($this->kitaA->getId())->getDevicePin();
+        self::assertMatchesRegularExpression('/^\d{4}$/', $pin);
+        self::assertNotContains($pin, ['1111', '2222']);
+
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-success', $pin);
+    }
+
+    public function testARandomPinIsNotAssignedWithoutAValidToken(): void
+    {
+        $this->client->loginUser($this->admin);
+        $this->client->request('POST', '/management/admin/edit-user/' . $this->kitaA->getId() . '/random-device-pin', [
+            '_token' => 'invalid',
+        ]);
+        self::assertResponseRedirects('/management/admin/edit-user/' . $this->kitaA->getId());
+
+        $this->em->clear();
+        self::assertSame('1111', $this->em->getRepository(User::class)->find($this->kitaA->getId())->getDevicePin());
+    }
+
     public function testAdminCanDeleteSelectedKitasAtOnce(): void
     {
         $content = $this->publishArticle($this->kitaC, 'Verschwindet mit der Kita');
@@ -369,6 +397,14 @@ final class AuthorizationFlowTest extends AppWebTestCase
     {
         $this->client->loginUser($this->kitaA);
         $this->client->request('POST', '/management/admin/reset-device-pins', ['ids' => [$this->kitaB->getId()]]);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testKitaCannotGiveAKitaARandomPin(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->client->request('POST', '/management/admin/edit-user/' . $this->kitaB->getId() . '/random-device-pin');
 
         self::assertResponseStatusCodeSame(403);
     }

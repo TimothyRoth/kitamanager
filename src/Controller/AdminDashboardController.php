@@ -163,6 +163,24 @@ final class AdminDashboardController extends ManagementController
         return $this->redirectToRoute('app_management_admin');
     }
 
+    #[Route('/admin/edit-user/{id}/random-device-pin', name: 'app_management_random_device_pin', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function assignRandomDevicePin(Request $request, User $user, DevicePinAssigner $pinAssigner): Response
+    {
+        if ($this->isCsrfTokenValid('random-device-pin' . $user->getId(), $request->request->get('_token'))) {
+            $pinAssigner->assignNewPins([$user]);
+            $this->entityManager->flush();
+            $this->addFlash('success', sprintf(
+                'Die neue Fernseher-PIN lautet %s. Bereits verbundene Fernseher zeigen wieder die PIN-Eingabe.',
+                $user->getDevicePin(),
+            ));
+        } else {
+            $this->addFlash('danger', 'Ungültiger CSRF-Token.');
+        }
+
+        return $this->redirectToRoute('app_management_edit_user', ['id' => $user->getId()]);
+    }
+
     #[Route('/admin/reset-device-pins', name: 'app_management_reset_device_pins', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     public function resetDevicePins(Request $request, DevicePinAssigner $pinAssigner): Response
