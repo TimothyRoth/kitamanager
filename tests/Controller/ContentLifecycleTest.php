@@ -6,15 +6,12 @@ use App\Entity\Content;
 use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Enum\ContentType;
-use App\Service\AudienceSynchronizer;
 use App\Service\ImageUploader;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
 use App\Tests\AppWebTestCase;
+use App\Tests\ImageFixturesTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
 /**
@@ -22,10 +19,9 @@ use Symfony\Component\String\Slugger\SluggerInterface;
  */
 final class ContentLifecycleTest extends AppWebTestCase
 {
+    use ImageFixturesTrait;
+
     private KernelBrowser $client;
-    private EntityManagerInterface $em;
-    private AudienceSynchronizer $audience;
-    private string $tmpDir;
 
     private User $kitaA;
     private User $kitaB;
@@ -34,80 +30,21 @@ final class ContentLifecycleTest extends AppWebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $container = static::getContainer();
 
-        $this->em = $container->get('doctrine')->getManager();
-        $this->audience = $container->get(AudienceSynchronizer::class);
-        $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $meta = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool = new SchemaTool($this->em);
-        $tool->dropSchema($meta);
-        $tool->createSchema($meta);
-
-        $this->kitaA = $this->makeUser($hasher, 'kita-a', 'kita-a-secret', '1111');
-        $this->kitaB = $this->makeUser($hasher, 'kita-b', 'kita-b-secret', '2222');
+        $this->openFreshDatabase();
+        $this->kitaA = $this->makeUser('kita-a', ['ROLE_USER'], '1111');
+        $this->kitaB = $this->makeUser('kita-b', ['ROLE_USER'], '2222');
         $this->kitaA->addPublishTarget($this->kitaB);
         $this->em->flush();
 
-        $this->tmpDir = sys_get_temp_dir() . '/km_lifecycle_' . bin2hex(random_bytes(4));
-        mkdir($this->tmpDir);
+        $this->createTempDir();
     }
 
     protected function tearDown(): void
     {
-        foreach (glob($this->tmpDir . '/*') ?: [] as $file) {
-            @unlink($file);
-        }
-        @rmdir($this->tmpDir);
+        $this->removeTempDir();
 
         parent::tearDown();
-    }
-
-    private function makeUser(UserPasswordHasherInterface $hasher, string $username, string $password, ?string $pin = null): User
-    {
-        $user = new User();
-        $user->setUsername($username);
-        $user->setRoles(['ROLE_USER']);
-        $user->setPassword($hasher->hashPassword($user, $password));
-        if (null !== $pin) {
-            $user->setDevicePin($pin);
-        }
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    private function makeJpeg(string $name): string
-    {
-        $path = $this->tmpDir . '/' . $name;
-        $img = imagecreatetruecolor(120, 80);
-        $bg = imagecolorallocate($img, 40, 120, 200);
-        imagefill($img, 0, 0, $bg);
-        imagejpeg($img, $path, 90);
-
-        return $path;
-    }
-
-    private function seedArticle(User $creator, string $title, array $audienceIds = []): Content
-    {
-        $creator = $this->em->find(User::class, $creator->getId());
-        self::assertNotNull($creator);
-
-        $content = new Content();
-        $content->setType(ContentType::ARTICLE);
-        $content->setTitle($title);
-        $content->setContent('Body of ' . $title);
-        $content->setImageUrl('/uploads/test.jpg');
-        $content->setCreator($creator);
-        $this->em->persist($content);
-        $this->em->flush();
-
-        $this->audience->syncContentAudience($content, $audienceIds, false);
-        $this->em->flush();
-
-        return $content;
     }
 
     public function testCreateArticleViaFormCreatesSliderItems(): void
@@ -215,8 +152,7 @@ final class ContentLifecycleTest extends AppWebTestCase
     public function testPhotoFormReportsAPhotoThatCannotBeStored(): void
     {
         $this->client->loginUser($this->kitaA);
-        $logged = $this->whileTheUploadFolderIsBlocked(
-            fn () => $this->submitPhotoForm([$this->makeJpeg('unstorable.jpg')])
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->submitPhotoForm([$this->makeJpeg('unstorable.jpg')])
         );
 
         self::assertResponseRedirects('/management/user/create-image');
@@ -265,7 +201,7 @@ final class ContentLifecycleTest extends AppWebTestCase
         ]);
         $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
 
-        $logged = $this->whileTheUploadFolderIsBlocked(fn () => $this->client->submit($form));
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->client->submit($form));
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
@@ -275,14 +211,14 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testEditFormReportsAnImageThatCannotBeStored(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Bleibt');
+        $article = $this->publishArticle($this->kitaA, 'Bleibt');
 
         $this->client->loginUser($this->kitaA);
         $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
         $form = $crawler->selectButton('Änderungen speichern')->form(['content[title]' => 'Neu']);
         $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
 
-        $logged = $this->whileTheUploadFolderIsBlocked(fn () => $this->client->submit($form));
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->client->submit($form));
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
@@ -311,31 +247,9 @@ final class ContentLifecycleTest extends AppWebTestCase
         $this->client->request('POST', $form->getUri(), $values, $files);
     }
 
-    /**
-     * Runs the action with a file where kita-a's upload folder should be and
-     * returns what was logged meanwhile.
-     */
-    private function whileTheUploadFolderIsBlocked(callable $action): string
-    {
-        $uploadFolder = static::getContainer()->getParameter('uploads_directory') . '/' . $this->kitaA->getId();
-        $filesystem = new Filesystem();
-        $filesystem->remove($uploadFolder);
-        $filesystem->dumpFile($uploadFolder, 'a file where the upload folder should be');
-        $logFile = static::getContainer()->getParameter('kernel.logs_dir') . '/test.log';
-        $logSizeBefore = is_file($logFile) ? filesize($logFile) : 0;
-
-        try {
-            $action();
-        } finally {
-            $filesystem->remove($uploadFolder);
-        }
-
-        return (string) file_get_contents($logFile, false, null, $logSizeBefore);
-    }
-
     public function testEditingAnArticleRequiresATitle(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Bleibt');
+        $article = $this->publishArticle($this->kitaA, 'Bleibt');
 
         $this->client->loginUser($this->kitaA);
         $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
@@ -377,7 +291,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testUnsafeArticleTextAlreadyStoredIsCleanedOnTheSlider(): void
     {
-        $this->seedArticle($this->kitaA, 'Altbestand')->setContent(self::UNSAFE_ARTICLE_TEXT);
+        $this->publishArticle($this->kitaA, 'Altbestand')->setContent(self::UNSAFE_ARTICLE_TEXT);
         $this->em->flush();
 
         $this->client->request('GET', '/slider/kita-a');
@@ -393,7 +307,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testUnsafeArticleTextAlreadyStoredIsCleanedInTheEditor(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Altbestand');
+        $article = $this->publishArticle($this->kitaA, 'Altbestand');
         $article->setContent(self::UNSAFE_ARTICLE_TEXT);
         $this->em->flush();
 
@@ -416,7 +330,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testEditingAnArticleReplacesItsTextAndImage(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Alter Titel');
+        $article = $this->publishArticle($this->kitaA, 'Alter Titel');
         $uploads = static::getContainer()->getParameter('uploads_directory');
         $oldImage = $uploads . '/' . $this->kitaA->getId() . '/alt.jpg';
         @mkdir(dirname($oldImage), 0777, true);
@@ -445,7 +359,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testDeleteContentRemovesRowAndSliderItems(): void
     {
-        $content = $this->seedArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);
+        $content = $this->publishArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);
         $contentId = $content->getId();
         $itemIds = array_map(
             static fn (SliderItem $i) => $i->getId(),
@@ -468,8 +382,8 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testBulkDeleteSkipsUnauthorizedIds(): void
     {
-        $own = $this->seedArticle($this->kitaA, 'Eigen');
-        $foreign = $this->seedArticle($this->kitaB, 'Fremd');
+        $own = $this->publishArticle($this->kitaA, 'Eigen');
+        $foreign = $this->publishArticle($this->kitaB, 'Fremd');
 
         $this->client->loginUser($this->kitaA);
         $crawler = $this->client->request('GET', '/management/user');

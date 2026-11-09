@@ -5,22 +5,13 @@ namespace App\Tests\Service;
 use App\Entity\Content;
 use App\Entity\SliderItem;
 use App\Entity\User;
-use App\Enum\ContentType;
-use App\Service\AudienceSynchronizer;
 use App\Tests\AppKernelTestCase;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Domain tests for audience → SliderItem reconciliation.
  */
 final class AudienceSynchronizerTest extends AppKernelTestCase
 {
-    private EntityManagerInterface $em;
-    private AudienceSynchronizer $audience;
-    private UserPasswordHasherInterface $hasher;
-
     private User $admin;
     private User $kitaA;
     private User $kitaB;
@@ -29,17 +20,8 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
     protected function setUp(): void
     {
         self::bootKernel();
-        $container = static::getContainer();
 
-        $this->em = $container->get('doctrine')->getManager();
-        $this->audience = $container->get(AudienceSynchronizer::class);
-        $this->hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $meta = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool = new SchemaTool($this->em);
-        $tool->dropSchema($meta);
-        $tool->createSchema($meta);
-
+        $this->openFreshDatabase();
         $this->admin = $this->makeUser('admin', ['ROLE_ADMIN']);
         $this->kitaA = $this->makeUser('kita-a', ['ROLE_USER']);
         $this->kitaB = $this->makeUser('kita-b', ['ROLE_USER']);
@@ -49,43 +31,9 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
         $this->em->flush();
     }
 
-    private function makeUser(string $username, array $roles): User
-    {
-        $user = new User();
-        $user->setUsername($username);
-        $user->setRoles($roles);
-        $user->setPassword($this->hasher->hashPassword($user, 'secret'));
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    private function createArticle(User $creator, string $title): Content
-    {
-        $content = new Content();
-        $content->setType(ContentType::ARTICLE);
-        $content->setTitle($title);
-        $content->setContent('Body');
-        $content->setImageUrl('/uploads/test.jpg');
-        $content->setCreator($creator);
-        $this->em->persist($content);
-        $this->em->flush();
-
-        return $content;
-    }
-
-    private function sliderItemFor(Content $content, User $consumer): ?SliderItem
-    {
-        return $this->em->getRepository(SliderItem::class)->findOneBy([
-            'content' => $content,
-            'consumer' => $consumer,
-        ]);
-    }
-
     public function testIgnoresForbiddenAudienceIds(): void
     {
-        $content = $this->createArticle($this->kitaA, 'Nur erlaubte');
+        $content = $this->makeArticle($this->kitaA, 'Nur erlaubte');
 
         $this->audience->syncContentAudience($content, [$this->kitaB->getId(), $this->kitaC->getId()], false);
         $this->em->flush();
@@ -100,7 +48,7 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
         $this->admin->setPublishToAll(true);
         $this->em->flush();
 
-        $content = $this->createArticle($this->admin, 'Zentral');
+        $content = $this->makeArticle($this->admin, 'Zentral');
         $this->audience->syncContentAudience($content, [], true);
         $this->em->flush();
 
@@ -115,7 +63,7 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
         $this->admin->setPublishToAll(true);
         $this->em->flush();
 
-        $content = $this->createArticle($this->admin, 'Für alle');
+        $content = $this->makeArticle($this->admin, 'Für alle');
         $this->audience->syncContentAudience($content, [], true);
         $this->em->flush();
 
@@ -131,7 +79,7 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
         $this->admin->setPublishToAll(true);
         $this->em->flush();
 
-        $content = $this->createArticle($this->admin, 'Für alle');
+        $content = $this->makeArticle($this->admin, 'Für alle');
         $this->audience->syncContentAudience($content, [], true);
         $this->em->flush();
 
@@ -144,7 +92,7 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
 
     public function testAddingPublishTargetMaterializesAudienceAllContent(): void
     {
-        $content = $this->createArticle($this->kitaA, 'An alle Ziele');
+        $content = $this->makeArticle($this->kitaA, 'An alle Ziele');
         $this->audience->syncContentAudience($content, [], true);
         $this->em->flush();
 
@@ -162,9 +110,9 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
 
     public function testMultiInsertAssignsUniqueDisplayOrders(): void
     {
-        $c1 = $this->createArticle($this->kitaA, 'Eins');
-        $c2 = $this->createArticle($this->kitaA, 'Zwei');
-        $c3 = $this->createArticle($this->kitaA, 'Drei');
+        $c1 = $this->makeArticle($this->kitaA, 'Eins');
+        $c2 = $this->makeArticle($this->kitaA, 'Zwei');
+        $c3 = $this->makeArticle($this->kitaA, 'Drei');
 
         $this->audience->syncContentAudience($c1, [], false);
         $this->audience->syncContentAudience($c2, [], false);
@@ -183,7 +131,7 @@ final class AudienceSynchronizerTest extends AppKernelTestCase
 
     public function testSyncPreservesEnabledStateForKeptConsumers(): void
     {
-        $content = $this->createArticle($this->kitaA, 'Geteilt');
+        $content = $this->makeArticle($this->kitaA, 'Geteilt');
         $this->audience->syncContentAudience($content, [$this->kitaB->getId()], false);
         $this->em->flush();
 

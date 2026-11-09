@@ -11,6 +11,7 @@ use Symfony\Component\HttpKernel\KernelInterface;
  */
 abstract class AppKernelTestCase extends KernelTestCase
 {
+    use DatabaseFixturesTrait;
     use EnsuresIsolatedTestResourcesTrait;
 
     protected static function bootKernel(array $options = []): KernelInterface
