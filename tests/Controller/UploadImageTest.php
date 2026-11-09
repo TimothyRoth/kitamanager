@@ -75,11 +75,21 @@ final class UploadImageTest extends AppWebTestCase
 
     private function postImage(string $path, string $originalName, string $mime, array $extra = []): void
     {
+        $this->postImageWithToken($this->uploadToken(), $path, $originalName, $mime, $extra);
+    }
+
+    private function uploadToken(): string
+    {
         // Hitting a management page first starts the session so CSRF tokens work.
         $crawler = $this->client->request('GET', '/management/user/create-image');
         $token = $crawler->filter('form[data-upload-token]')->attr('data-upload-token');
         self::assertNotEmpty($token);
 
+        return $token;
+    }
+
+    private function postImageWithToken(string $token, string $path, string $originalName, string $mime, array $extra = []): void
+    {
         // Copy the fixture so UploadedFile can move it without consuming the original.
         $uploadPath = $this->tmpDir . '/upload_' . $originalName;
         copy($path, $uploadPath);
@@ -103,6 +113,44 @@ final class UploadImageTest extends AppWebTestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertTrue($body['ok']);
         self::assertFalse($body['downscaled']);
+    }
+
+    public function testDashboardConfirmsHowManyPhotosWereUploaded(): void
+    {
+        $token = $this->uploadToken();
+        $this->postImageWithToken($token, $this->makeJpeg('eins.jpg', 120, 80), 'eins.jpg', 'image/jpeg');
+        $this->postImageWithToken($token, $this->makeJpeg('zwei.jpg', 120, 80), 'zwei.jpg', 'image/jpeg');
+
+        $this->client->request('GET', '/management/user');
+
+        self::assertSelectorTextContains('.alert-success', '2 Bild(er) erfolgreich hochgeladen! Prüfen Sie die Reihenfolge in „Mein Slider“.');
+    }
+
+    public function testAdminSeesTheUploadConfirmationOnTheAdminDashboard(): void
+    {
+        $admin = new User();
+        $admin->setUsername('admin');
+        $admin->setRoles(['ROLE_ADMIN']);
+        $admin->setPassword('not used: the test logs in directly');
+        $this->em->persist($admin);
+        $this->em->flush();
+        $this->client->loginUser($admin);
+
+        $this->postImage($this->makeJpeg('zentral.jpg', 120, 80), 'zentral.jpg', 'image/jpeg');
+        $this->client->request('GET', '/management/user');
+        self::assertResponseRedirects('/management/admin');
+        $this->client->followRedirect();
+
+        self::assertSelectorTextContains('.alert-success', '1 Bild(er) erfolgreich hochgeladen!');
+        self::assertSelectorTextNotContains('.alert-success', 'Mein Slider');
+    }
+
+    public function testTheDashboardAddressAloneConfirmsNoUpload(): void
+    {
+        $this->client->request('GET', '/management/user?uploaded=5');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('.alert-success');
     }
 
     public function testLargeImageIsDownscaled(): void

@@ -203,6 +203,15 @@ final class ContentLifecycleTest extends AppWebTestCase
         }
     }
 
+    public function testPhotoFormConfirmsHowManyPhotosWereStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg')]);
+        $this->client->followRedirect();
+
+        self::assertSelectorTextContains('.alert-success', '2 Bild(er) erfolgreich hochgeladen! Prüfen Sie die Reihenfolge in „Mein Slider“.');
+    }
+
     public function testPhotoFormReportsAPhotoThatCannotBeStored(): void
     {
         $this->client->loginUser($this->kitaA);

@@ -339,6 +339,7 @@ final class ManagementController extends AbstractController
                 }
 
                 $created[] = $image;
+                $this->rememberUploadedImage();
             }
 
             foreach ($failed as $failure) {
@@ -346,8 +347,6 @@ final class ManagementController extends AbstractController
             }
 
             if ($created) {
-                $this->addFlash('success', sprintf('%d Bild(er) erfolgreich hochgeladen!', count($created)));
-
                 return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
 
@@ -437,7 +436,18 @@ final class ManagementController extends AbstractController
             return $this->uploadError(self::IMAGE_NOT_STORED, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        $this->rememberUploadedImage();
+
         return $this->json(['ok' => true, 'downscaled' => $downscaled]);
+    }
+
+    /**
+     * One flash entry per stored picture: the next page counts them and shows a
+     * single message, also when the pictures arrived in separate requests.
+     */
+    private function rememberUploadedImage(): void
+    {
+        $this->addFlash('uploaded-image', true);
     }
 
     private function uploadError(string $message, int $status = Response::HTTP_UNPROCESSABLE_ENTITY): JsonResponse

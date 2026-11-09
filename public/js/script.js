@@ -680,16 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
         xhr.send(formData);
     });
 
-    // Append ?uploaded=N while preserving an optional #fragment on the success URL.
-    const buildUploadSuccessUrl = (successUrl, uploadedCount) => {
-        const hashIndex = successUrl.indexOf('#');
-        const hash = hashIndex >= 0 ? successUrl.slice(hashIndex) : '';
-        const base = hashIndex >= 0 ? successUrl.slice(0, hashIndex) : successUrl;
-        const separator = base.includes('?') ? '&' : '?';
-
-        return base + separator + 'uploaded=' + uploadedCount + hash;
-    };
-
     // Bulk upload: send the images ONE BY ONE to the JSON endpoint so the
     // server only ever processes a single image per request (OOM protection)
     // and each image can be downscaled with visible per-image feedback.
@@ -768,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (failures.length === 0) {
             ui.label.textContent = 'Fertig – Sie werden weitergeleitet…';
-            window.location.href = buildUploadSuccessUrl(successUrl, uploadedCount);
+            window.location.href = successUrl;
             return;
         }
 

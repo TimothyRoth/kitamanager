@@ -10,17 +10,6 @@
     <main class="page">
         {{ include('management/_flashes.html.twig') }}
 
-        {# Set by the AJAX bulk upload, which redirects here after the last
-           image instead of using a session flash. #}
-        {% set uploadedCount = app.request.query.getInt('uploaded') %}
-        {% if uploadedCount > 0 %}
-            <div class="alert alert-success" role="status">
-                {{ uploadedCount }} Bild(er) erfolgreich hochgeladen!
-                Prüfen Sie die Reihenfolge in „Mein Slider“.
-                Änderungen erscheinen auf dem Fernseher in Kürze.
-            </div>
-        {% endif %}
-
         <section class="hero">
             <h1>Willkommen, {{ app.user.username }}!</h1>
             <nav class="quick-actions" aria-label="Schnellaktionen">
