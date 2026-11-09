@@ -7,12 +7,15 @@ use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Enum\ContentType;
 use App\Service\AudienceSynchronizer;
+use App\Service\ImageUploader;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\String\Slugger\SluggerInterface;
 
 /**
  * Content CRUD, validation, bulk delete, and TV cookie linking.
@@ -183,6 +186,142 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('.form-errors', 'Bitte laden Sie ein gültiges Bild hoch');
         self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testPhotoFormStoresEveryPhotoWithItsSliderEntries(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg')]);
+
+        self::assertResponseRedirects('/management/user#mein-slider');
+        $this->em->clear();
+        $photos = $this->em->getRepository(Content::class)->findAll();
+        self::assertCount(2, $photos);
+        foreach ($photos as $photo) {
+            self::assertSame(ContentType::IMAGE, $photo->getType());
+            self::assertCount(2, $this->em->getRepository(SliderItem::class)->findBy(['content' => $photo]));
+        }
+    }
+
+    public function testPhotoFormReportsAPhotoThatCannotBeStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $logged = $this->whileTheUploadFolderIsBlocked(
+            fn () => $this->submitPhotoForm([$this->makeJpeg('unstorable.jpg')])
+        );
+
+        self::assertResponseRedirects('/management/user/create-image');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testPhotoFormKeepsThePhotosStoredBeforeAFailure(): void
+    {
+        $container = static::getContainer();
+        $container->set(ImageUploader::class, new class($container->getParameter('uploads_directory'), $container->get(SluggerInterface::class), new Filesystem()) extends ImageUploader {
+            private int $uploads = 0;
+
+            public function upload(UploadedFile $file, int $userId): string
+            {
+                if (2 === ++$this->uploads) {
+                    throw new \RuntimeException('The disk is full.');
+                }
+
+                return parent::upload($file, $userId);
+            }
+        });
+        $this->client->disableReboot();
+
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg'), $this->makeJpeg('drei.jpg')]);
+
+        self::assertResponseRedirects('/management/user#mein-slider');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        $this->em->clear();
+        $photos = $this->em->getRepository(Content::class)->findAll();
+        self::assertCount(1, $photos);
+        self::assertCount(2, $this->em->getRepository(SliderItem::class)->findBy(['content' => $photos[0]]));
+    }
+
+    public function testArticleFormReportsAnImageThatCannotBeStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-article');
+        $form = $crawler->selectButton('Speichern')->form([
+            'content[title]' => 'Hallo Kita',
+            'content[content]' => 'Artikeltext',
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
+
+        $logged = $this->whileTheUploadFolderIsBlocked(fn () => $this->client->submit($form));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testEditFormReportsAnImageThatCannotBeStored(): void
+    {
+        $article = $this->seedArticle($this->kitaA, 'Bleibt');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $form = $crawler->selectButton('Änderungen speichern')->form(['content[title]' => 'Neu']);
+        $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
+
+        $logged = $this->whileTheUploadFolderIsBlocked(fn () => $this->client->submit($form));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        $this->em->clear();
+        $unchanged = $this->em->getRepository(Content::class)->find($article->getId());
+        self::assertSame('Bleibt', $unchanged->getTitle());
+        self::assertSame('/uploads/test.jpg', $unchanged->getImageUrl());
+    }
+
+    private const IMAGE_NOT_STORED = 'Beim Speichern des Bildes gab es einen unerwarteten Fehler.';
+
+    /**
+     * @param list<string> $photoPaths
+     */
+    private function submitPhotoForm(array $photoPaths): void
+    {
+        $crawler = $this->client->request('GET', '/management/user/create-image');
+        $form = $crawler->selectButton('Fotos hochladen')->form();
+        $values = $form->getPhpValues();
+        $files = ['content' => ['imageFile' => []]];
+        foreach ($photoPaths as $photoPath) {
+            $files['content']['imageFile'][] = new UploadedFile($photoPath, basename($photoPath), 'image/jpeg', null, true);
+        }
+
+        $this->client->request('POST', $form->getUri(), $values, $files);
+    }
+
+    /**
+     * Runs the action with a file where kita-a's upload folder should be and
+     * returns what was logged meanwhile.
+     */
+    private function whileTheUploadFolderIsBlocked(callable $action): string
+    {
+        $uploadFolder = static::getContainer()->getParameter('uploads_directory') . '/' . $this->kitaA->getId();
+        $filesystem = new Filesystem();
+        $filesystem->remove($uploadFolder);
+        $filesystem->dumpFile($uploadFolder, 'a file where the upload folder should be');
+        $logFile = static::getContainer()->getParameter('kernel.logs_dir') . '/test.log';
+        $logSizeBefore = is_file($logFile) ? filesize($logFile) : 0;
+
+        try {
+            $action();
+        } finally {
+            $filesystem->remove($uploadFolder);
+        }
+
+        return (string) file_get_contents($logFile, false, null, $logSizeBefore);
     }
 
     public function testEditingAnArticleRequiresATitle(): void

@@ -41,6 +41,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ManagementController extends AbstractController
 {
     private const USERNAME_TAKEN = 'Ein Benutzer mit diesem oder einem sehr ähnlichen Namen existiert bereits. Wählen Sie bitte einen anderen.';
+    private const IMAGE_NOT_STORED = 'Beim Speichern des Bildes gab es einen unerwarteten Fehler.';
 
     public function __construct(private readonly Dashboard $dashboard)
     {
@@ -280,7 +281,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-image', name: 'app_management_create_image')]
-    public function createImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
+    public function createImage(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB pro Bild – bitte laden Sie weniger Bilder gleichzeitig hoch.');
@@ -319,20 +320,26 @@ final class ManagementController extends AbstractController
                     }
                 }
 
-                $image = new Content();
-                $image->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
-                $image->setType(eContentType::IMAGE);
-                $image->setCreator($creator);
-                $entityManager->persist($image);
+                // Each photo is stored completely before the next one starts,
+                // so a failure leaves nothing half-stored behind it.
+                try {
+                    $image = new Content();
+                    $image->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
+                    $image->setType(eContentType::IMAGE);
+                    $image->setCreator($creator);
+                    $entityManager->persist($image);
+                    $entityManager->flush();
+
+                    $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
+                    $entityManager->flush();
+                } catch (\Exception $e) {
+                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $failed[] = self::IMAGE_NOT_STORED;
+                    break;
+                }
+
                 $created[] = $image;
             }
-
-            $entityManager->flush();
-
-            foreach ($created as $image) {
-                $audienceSynchronizer->syncContentAudience($image, $audienceIds, $audienceAll);
-            }
-            $entityManager->flush();
 
             foreach ($failed as $failure) {
                 $this->addFlash('danger', $failure);
@@ -427,7 +434,7 @@ final class ManagementController extends AbstractController
         } catch (\Exception $e) {
             $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
 
-            return $this->uploadError('Beim Speichern des Bildes gab es einen unerwarteten Fehler.', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->uploadError(self::IMAGE_NOT_STORED, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return $this->json(['ok' => true, 'downscaled' => $downscaled]);
@@ -461,7 +468,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/create-article', name: 'app_management_create_article')]
-    public function createArticle(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer): Response
+    public function createArticle(Request $request, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB für das Bild.');
@@ -486,22 +493,27 @@ final class ManagementController extends AbstractController
             $imageFile = $form->get('imageFile')->getData();
 
             if ($this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
-                $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
+                try {
+                    $imageUrl = $imageUploader->upload($imageFile, $creator->getId());
 
-                $content->setImageUrl($imageUrl);
-                $content->setType(eContentType::ARTICLE);
-                $content->setCreator($creator);
+                    $content->setImageUrl($imageUrl);
+                    $content->setType(eContentType::ARTICLE);
+                    $content->setCreator($creator);
 
-                $entityManager->persist($content);
-                $entityManager->flush();
+                    $entityManager->persist($content);
+                    $entityManager->flush();
 
-                ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
-                $entityManager->flush();
+                    ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+                    $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                    $entityManager->flush();
 
-                $this->addFlash('success', 'Artikel erfolgreich erstellt!');
+                    $this->addFlash('success', 'Artikel erfolgreich erstellt!');
 
-                return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
+                    return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
+                } catch (\Exception $e) {
+                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $this->addFlash('danger', self::IMAGE_NOT_STORED);
+                }
             }
         }
 
@@ -512,7 +524,7 @@ final class ManagementController extends AbstractController
     }
 
     #[Route('/user/edit-content/{id}', name: 'app_management_edit_content')]
-    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository): Response
+    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository, LoggerInterface $logger): Response
     {
         $this->denyAccessUnlessGranted('EDIT', $content);
 
@@ -550,24 +562,29 @@ final class ManagementController extends AbstractController
             $imageFile = $form->get('imageFile')->getData();
 
             if (null === $imageFile || $this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
-                $replacedImageUrl = null;
-                if ($imageFile) {
-                    $replacedImageUrl = $content->getImageUrl();
-                    $content->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
-                }
+                try {
+                    $replacedImageUrl = null;
+                    if ($imageFile) {
+                        $replacedImageUrl = $content->getImageUrl();
+                        $content->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
+                    }
 
-                $entityManager->flush();
-                $imageUploader->delete($replacedImageUrl);
-
-                if ($form->has('audience')) {
-                    ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                    $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
                     $entityManager->flush();
+                    $imageUploader->delete($replacedImageUrl);
+
+                    if ($form->has('audience')) {
+                        ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
+                        $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                        $entityManager->flush();
+                    }
+
+                    $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
+
+                    return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
+                } catch (\Exception $e) {
+                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $this->addFlash('danger', self::IMAGE_NOT_STORED);
                 }
-
-                $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
-
-                return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
             }
         }
 
