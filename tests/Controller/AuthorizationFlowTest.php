@@ -811,6 +811,33 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertTrue($body['unlinked'] ?? false);
     }
 
+    /**
+     * tv.js marks its poll as a script request, and it ignores every answer
+     * that is not 200: the marker must never turn the poll into anything else.
+     */
+    public function testPollMarkedAsScriptRequestGetsItsSlidesWithStatus200(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1', [], [], [
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+            'HTTP_X_DISPLAY_PIN' => '1111',
+        ]);
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(['signature', 'duration', 'html'], array_keys($body));
+    }
+
+    public function testPollMarkedAsScriptRequestIsUnlinkedWithStatus200(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1', [], [], [
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+            'HTTP_X_DISPLAY_PIN' => '9999',
+        ]);
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(['unlinked' => true], json_decode($this->client->getResponse()->getContent(), true));
+    }
+
     public function testNewContentAppearsOnTvWithoutReload(): void
     {
         $crawler = $this->client->request('GET', '/slider/display');
