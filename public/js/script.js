@@ -198,58 +198,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Initialize WYSIWYG Editor
     const initWysiwyg = () => {
-        const textareas = document.querySelectorAll('.wysiwyg');
+        const formats = [
+            {command: 'formatBlock', value: 'H2', label: 'H2', icon: 'H2'},
+            {command: 'formatBlock', value: 'H3', label: 'H3', icon: 'H3'},
+            {command: 'bold', label: 'Fett', icon: '<strong>B</strong>'},
+            {command: 'italic', label: 'Kursiv', icon: '<em>I</em>'},
+            {command: 'insertUnorderedList', label: 'Liste (Punkte)', icon: '• Liste'},
+            {command: 'insertOrderedList', label: 'Liste (Zahlen)', icon: '1. Liste'}
+        ];
 
-        textareas.forEach(textarea => {
+        document.querySelectorAll('.wysiwyg').forEach(textarea => {
             const wrapper = document.createElement('div');
             wrapper.className = 'wysiwyg-wrapper';
             textarea.parentNode.insertBefore(wrapper, textarea);
-
-            const toolbar = document.createElement('div');
-            toolbar.className = 'wysiwyg-toolbar';
-
-            const buttons = [
-                {command: 'formatBlock', value: 'H2', label: 'H2', icon: 'H2'},
-                {command: 'formatBlock', value: 'H3', label: 'H3', icon: 'H3'},
-                {command: 'bold', label: 'Fett', icon: '<strong>B</strong>'},
-                {command: 'italic', label: 'Kursiv', icon: '<em>I</em>'},
-                {command: 'insertUnorderedList', label: 'Liste (Punkte)', icon: '• Liste'},
-                {command: 'insertOrderedList', label: 'Liste (Zahlen)', icon: '1. Liste'}
-            ];
-
-            buttons.forEach(btn => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'wysiwyg-btn';
-                button.innerHTML = btn.icon;
-                button.title = btn.label;
-
-                button.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    let value = btn.value || null;
-                    document.execCommand(btn.command, false, value);
-                    editor.focus();
-                    updateTextarea();
-                });
-                toolbar.appendChild(button);
-            });
 
             const editor = document.createElement('div');
             editor.className = 'wysiwyg-editor form-control';
             editor.contentEditable = true;
             editor.innerHTML = textarea.value;
 
+            const updateTextarea = () => {
+                textarea.value = editor.innerHTML;
+            };
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'wysiwyg-toolbar';
+
+            formats.forEach(format => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'wysiwyg-btn';
+                button.innerHTML = format.icon;
+                button.title = format.label;
+
+                button.addEventListener('click', () => {
+                    document.execCommand(format.command, false, format.value || null);
+                    editor.focus();
+                    updateTextarea();
+                });
+                toolbar.appendChild(button);
+            });
+
             wrapper.appendChild(toolbar);
             wrapper.appendChild(editor);
             wrapper.appendChild(textarea);
 
             textarea.style.display = 'none';
-
-            const updateTextarea = () => {
-                textarea.value = editor.innerHTML;
-            };
 
             editor.addEventListener('input', updateTextarea);
             editor.addEventListener('blur', updateTextarea);
@@ -389,27 +384,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshMeta();
             });
 
-            selectVisible.addEventListener('click', () => {
-                visibleItems().forEach(item => {
+            const setChecked = (affectedItems, checked) => {
+                affectedItems.forEach(item => {
                     const input = item.querySelector('input[type="checkbox"]');
                     if (input && !input.disabled) {
-                        input.checked = true;
+                        input.checked = checked;
                         input.dispatchEvent(new Event('change', {bubbles: true}));
                     }
                 });
                 refreshMeta();
-            });
+            };
 
-            clearSelection.addEventListener('click', () => {
-                items.forEach(item => {
-                    const input = item.querySelector('input[type="checkbox"]');
-                    if (input && !input.disabled) {
-                        input.checked = false;
-                        input.dispatchEvent(new Event('change', {bubbles: true}));
-                    }
-                });
-                refreshMeta();
-            });
+            selectVisible.addEventListener('click', () => setChecked(visibleItems(), true));
+            clearSelection.addEventListener('click', () => setChecked(items, false));
 
             list.addEventListener('change', refreshMeta);
             refreshMeta();
@@ -468,6 +455,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPreview();
             };
 
+            const addBadge = (media, text, extraClass = '') => {
+                const badge = document.createElement('span');
+                badge.className = `image-preview-badge ${extraClass}`.trim();
+                badge.textContent = text;
+                media.appendChild(badge);
+            };
+
             const renderPreview = () => {
                 // Release any previously created object URLs to avoid leaks.
                 preview.querySelectorAll('img').forEach(img => URL.revokeObjectURL(img.src));
@@ -506,26 +500,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!isImage) {
                         tile.classList.add('is-rejected');
                         tile.title = `${file.name} ist kein Bild`;
-
-                        const badge = document.createElement('span');
-                        badge.className = 'image-preview-badge is-error';
-                        badge.textContent = 'kein Bild';
-                        media.appendChild(badge);
+                        addBadge(media, 'kein Bild', 'is-error');
                     } else if (file.size > MAX_ORIGINAL_BYTES) {
                         tile.classList.add('is-rejected');
                         tile.title = `${file.name} ist größer als 25 MB und kann nicht hochgeladen werden`;
-
-                        const badge = document.createElement('span');
-                        badge.className = 'image-preview-badge is-error';
-                        badge.textContent = 'zu groß (max. 25 MB)';
-                        media.appendChild(badge);
+                        addBadge(media, 'zu groß (max. 25 MB)', 'is-error');
                     } else if (file.size > MAX_IMAGE_BYTES) {
                         tile.title = `${file.name} wird beim Hochladen automatisch verkleinert`;
-
-                        const badge = document.createElement('span');
-                        badge.className = 'image-preview-badge';
-                        badge.textContent = 'wird verkleinert';
-                        media.appendChild(badge);
+                        addBadge(media, 'wird verkleinert');
                     }
 
                     tile.appendChild(media);
@@ -552,16 +534,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const createUploadProgressUi = (form) => {
-        const existing = form.querySelector('.upload-progress');
-        if (existing) {
-            return {
-                root: existing,
-                bar: existing.querySelector('.upload-progress-bar'),
-                label: existing.querySelector('.upload-progress-label'),
-                percent: existing.querySelector('.upload-progress-percent'),
-            };
-        }
-
         const root = document.createElement('div');
         root.className = 'upload-progress is-hidden';
         root.setAttribute('role', 'status');
@@ -573,13 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <p class="upload-progress-percent">0%</p>
         `;
-
-        const submitButton = form.querySelector('[type="submit"]');
-        if (submitButton) {
-            submitButton.insertAdjacentElement('afterend', root);
-        } else {
-            form.appendChild(root);
-        }
+        form.querySelector('[type="submit"]').insertAdjacentElement('afterend', root);
 
         return {
             root,
@@ -587,6 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
             label: root.querySelector('.upload-progress-label'),
             percent: root.querySelector('.upload-progress-percent'),
         };
+    };
+
+    const showProgress = (ui, percent) => {
+        ui.bar.style.width = `${percent}%`;
+        ui.percent.textContent = `${percent}%`;
     };
 
     const showUploadProgressError = (form, message) => {
@@ -608,8 +579,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Success is visual only (green border) — no "Fertig" label that would
     // sit under / over the "wird verkleinert" badge. Errors keep a text line.
     const setTileStatus = (tile, text, state) => {
-        if (!tile) return;
-
         tile.classList.remove('is-uploading', 'is-done', 'is-failed');
         if (state) {
             tile.classList.add(state);
@@ -636,16 +605,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const collectAudience = (form) => {
         const allInput = form.querySelector('[data-audience-all]');
         const ids = Array.from(form.querySelectorAll('[data-audience-list] input[type="checkbox"]:checked'))
-            .map(cb => cb.value);
+            .map(checkbox => checkbox.value);
 
         return {all: !!(allInput && allInput.checked), ids};
     };
 
     // Upload ONE image to the JSON endpoint. Always resolves (never rejects)
     // with {ok, downscaled} or {ok: false, error}.
-    const uploadSingleImage = (endpoint, token, file, audience, onProgress) => new Promise(resolve => {
+    const uploadSingleImage = (form, file, audience, onProgress) => new Promise(resolve => {
         const formData = new FormData();
-        formData.append('_token', token);
+        formData.append('_token', form.dataset.uploadToken);
         formData.append('image', file);
         if (audience.all) {
             formData.append('audienceAll', '1');
@@ -653,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         audience.ids.forEach(id => formData.append('audience[]', id));
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', endpoint);
+        xhr.open('POST', form.dataset.uploadEndpoint);
         xhr.responseType = 'json';
 
         xhr.upload.addEventListener('progress', (e) => {
@@ -680,22 +649,71 @@ document.addEventListener('DOMContentLoaded', () => {
         xhr.send(formData);
     });
 
+    // Uploads one file of the batch and shows its state on its tile.
+    // Resolves with the error message, or with null when the file was stored.
+    const uploadWithTileStatus = async (send, file, tile, onProgress) => {
+        if (file.size > MAX_ORIGINAL_BYTES) {
+            setTileStatus(tile, 'Zu groß (max. 25 MB)', 'is-failed');
+            return 'Das Bild ist zu groß (max. 25 MB).';
+        }
+
+        const willDownscale = file.size > MAX_IMAGE_BYTES;
+        setTileStatus(tile, 'Wird hochgeladen… 0%', 'is-uploading');
+
+        const result = await send(file, (fraction) => {
+            const percent = Math.min(100, Math.round(fraction * 100));
+            setTileStatus(
+                tile,
+                percent >= 100
+                    ? (willDownscale ? 'Wird verkleinert…' : 'Wird gespeichert…')
+                    : `Wird hochgeladen… ${percent}%`,
+                'is-uploading'
+            );
+            onProgress(fraction);
+        });
+
+        if (!result.ok) {
+            setTileStatus(tile, result.error, 'is-failed');
+            tile.title = `${file.name}: ${result.error}`;
+            return result.error;
+        }
+
+        tile.title = result.downscaled
+            ? `${file.name}: hochgeladen und verkleinert`
+            : `${file.name}: hochgeladen`;
+        setTileStatus(tile, '', 'is-done');
+        return null;
+    };
+
+    // Keeps only the failed files selected, so a resubmit retries just them.
+    // The preview rebuilds its tiles for them; each gets its error back.
+    const selectFailedForRetry = (input, grid, failures) => {
+        const transfer = new DataTransfer();
+        failures.forEach(({file}) => transfer.items.add(file));
+        input.disabled = false;
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change'));
+
+        const retryTiles = Array.from(grid.querySelectorAll('.image-preview-tile'));
+        failures.forEach(({file, error}, index) => {
+            setTileStatus(retryTiles[index], error, 'is-failed');
+            retryTiles[index].title = `${file.name}: ${error}`;
+        });
+    };
+
     // Bulk upload: send the images ONE BY ONE to the JSON endpoint so the
     // server only ever processes a single image per request (OOM protection)
     // and each image can be downscaled with visible per-image feedback.
     const runSequentialUpload = async (form, input, ui) => {
-        const endpoint = form.dataset.uploadEndpoint;
-        const token = form.dataset.uploadToken;
-        const successUrl = form.dataset.uploadSuccessUrl;
-
         const files = Array.from(input.files);
         const audience = collectAudience(form);
+        const send = (file, onProgress) => uploadSingleImage(form, file, audience, onProgress);
         const grid = form.querySelector('.image-preview-grid');
-        const tiles = grid ? Array.from(grid.querySelectorAll('.image-preview-tile')) : [];
+        const tiles = Array.from(grid.querySelectorAll('.image-preview-tile'));
         const submitButton = form.querySelector('[type="submit"]');
 
         // Lock the selection while uploading.
-        if (submitButton) submitButton.disabled = true;
+        submitButton.disabled = true;
         input.disabled = true;
         tiles.forEach(tile => {
             tile.querySelector('.image-preview-remove')?.remove();
@@ -705,106 +723,151 @@ document.addEventListener('DOMContentLoaded', () => {
         form.querySelector('.upload-progress-error')?.remove();
         ui.root.classList.remove('is-hidden');
         ui.bar.classList.remove('is-indeterminate');
-        ui.bar.style.width = '0%';
-        ui.percent.textContent = '0%';
+        showProgress(ui, 0);
 
         const failures = [];
-        let uploadedCount = 0;
-
         for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const tile = tiles[i];
-            ui.label.textContent = `Bild ${i + 1} von ${files.length}: ${file.name}`;
+            ui.label.textContent = `Bild ${i + 1} von ${files.length}: ${files[i].name}`;
 
-            if (file.size > MAX_ORIGINAL_BYTES) {
-                failures.push({file, error: 'Das Bild ist zu groß (max. 25 MB).'});
-                setTileStatus(tile, 'Zu groß (max. 25 MB)', 'is-failed');
-                continue;
-            }
-
-            const willDownscale = file.size > MAX_IMAGE_BYTES;
-            setTileStatus(tile, 'Wird hochgeladen… 0%', 'is-uploading');
-
-            const result = await uploadSingleImage(endpoint, token, file, audience, (fraction) => {
-                const percent = Math.min(100, Math.round(fraction * 100));
-                setTileStatus(
-                    tile,
-                    percent >= 100
-                        ? (willDownscale ? 'Wird verkleinert…' : 'Wird gespeichert…')
-                        : `Wird hochgeladen… ${percent}%`,
-                    'is-uploading'
-                );
-
-                const overall = Math.min(100, Math.round(((i + fraction) / files.length) * 100));
-                ui.bar.style.width = overall + '%';
-                ui.percent.textContent = overall + '%';
+            const error = await uploadWithTileStatus(send, files[i], tiles[i], (fraction) => {
+                showProgress(ui, Math.min(100, Math.round(((i + fraction) / files.length) * 100)));
             });
-
-            if (result.ok) {
-                uploadedCount++;
-                tile.title = result.downscaled
-                    ? `${file.name}: hochgeladen und verkleinert`
-                    : `${file.name}: hochgeladen`;
-                setTileStatus(tile, '', 'is-done');
-            } else {
-                failures.push({file, error: result.error});
-                setTileStatus(tile, result.error, 'is-failed');
-                tile.title = `${file.name}: ${result.error}`;
+            if (error) {
+                failures.push({file: files[i], error});
             }
         }
-
-        ui.bar.style.width = '100%';
-        ui.percent.textContent = '100%';
+        showProgress(ui, 100);
 
         if (failures.length === 0) {
             ui.label.textContent = 'Fertig – Sie werden weitergeleitet…';
-            window.location.href = successUrl;
+            window.location.href = form.dataset.uploadSuccessUrl;
             return;
         }
 
-        // Keep only the failed files selected so a resubmit retries just them.
-        const transfer = new DataTransfer();
-        failures.forEach(({file}) => transfer.items.add(file));
-        input.disabled = false;
-        input.files = transfer.files;
-        input.dispatchEvent(new Event('change'));
+        selectFailedForRetry(input, grid, failures);
+        ui.root.classList.add('is-hidden');
+        submitButton.disabled = false;
 
-        // renderPreview rebuilt the tiles for the remaining (failed) files;
-        // re-attach the error message to each fresh tile.
-        const retryTiles = grid ? Array.from(grid.querySelectorAll('.image-preview-tile')) : [];
-        failures.forEach(({file, error}, index) => {
-            setTileStatus(retryTiles[index], error, 'is-failed');
-            if (retryTiles[index]) {
-                retryTiles[index].title = `${file.name}: ${error}`;
+        const storedCount = files.length - failures.length;
+        const summary = storedCount > 0
+            ? `${storedCount} Bild(er) hochgeladen, ${failures.length} fehlgeschlagen. Die fehlgeschlagenen Bilder bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`
+            : `${failures.length} Bild(er) konnten nicht hochgeladen werden. Sie bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`;
+        showUploadProgressError(form, summary);
+    };
+
+    const anySelectedFileLargerThan = (form, bytes) => {
+        return Array.from(form.querySelectorAll('input[type="file"]'))
+            .some(input => Array.from(input.files || []).some(file => file.size > bytes));
+    };
+
+    // Single-image forms: send the whole form in one request and show its progress.
+    const submitFormWithProgress = (form, ui) => {
+        // Originals above the hard cap cannot be stored at all; the
+        // server would reject them, so fail fast before uploading.
+        if (anySelectedFileLargerThan(form, MAX_ORIGINAL_BYTES)) {
+            showUploadProgressError(
+                form,
+                'Das ausgewählte Bild ist größer als 25 MB und kann nicht hochgeladen werden. Bitte verkleinern Sie es.'
+            );
+            return;
+        }
+
+        const willDownscale = anySelectedFileLargerThan(form, MAX_IMAGE_BYTES);
+        const submitButton = form.querySelector('[type="submit"]');
+
+        const stop = () => {
+            ui.root.classList.add('is-hidden');
+            ui.bar.classList.remove('is-indeterminate');
+            showProgress(ui, 0);
+            ui.label.textContent = 'Wird hochgeladen…';
+            form.querySelector('.upload-progress-error')?.remove();
+            submitButton.disabled = false;
+        };
+
+        syncWysiwygFields(form);
+        submitButton.disabled = true;
+        ui.root.classList.remove('is-hidden');
+        form.querySelector('.upload-progress-error')?.remove();
+        ui.label.textContent = 'Dateien werden hochgeladen…';
+
+        const xhr = new XMLHttpRequest();
+        xhr.open(form.method || 'POST', form.action);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (!e.lengthComputable) {
+                ui.bar.classList.add('is-indeterminate');
+                ui.percent.textContent = 'Upload läuft…';
+                return;
+            }
+
+            ui.bar.classList.remove('is-indeterminate');
+            const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+            showProgress(ui, percent);
+
+            if (percent >= 100) {
+                ui.label.textContent = willDownscale
+                    ? 'Wird verkleinert…'
+                    : 'Wird auf dem Server verarbeitet…';
             }
         });
 
-        ui.root.classList.add('is-hidden');
-        if (submitButton) submitButton.disabled = false;
+        xhr.addEventListener('load', () => {
+            stop();
 
-        const summary = uploadedCount > 0
-            ? `${uploadedCount} Bild(er) hochgeladen, ${failures.length} fehlgeschlagen. Die fehlgeschlagenen Bilder bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`
-            : `${failures.length} Bild(er) konnten nicht hochgeladen werden. Sie bleiben ausgewählt – klicken Sie erneut auf „Speichern“, um es noch einmal zu versuchen.`;
-        showUploadProgressError(form, summary);
+            if (xhr.status === 413) {
+                showUploadProgressError(
+                    form,
+                    'Der Upload war zu groß. Bitte ein kleineres Bild wählen (max. 25 MB).'
+                );
+                return;
+            }
+
+            if (xhr.status === 0) {
+                showUploadProgressError(
+                    form,
+                    'Verbindung unterbrochen. Bitte erneut versuchen.'
+                );
+                return;
+            }
+
+            if (xhr.status >= 500) {
+                showUploadProgressError(
+                    form,
+                    'Serverfehler beim Hochladen. Bitte später erneut versuchen.'
+                );
+                return;
+            }
+
+            const responsePath = new URL(xhr.responseURL).pathname;
+            const formPath = new URL(form.action, window.location.origin).pathname;
+
+            if (responsePath !== formPath) {
+                window.location.href = xhr.responseURL;
+                return;
+            }
+
+            // Validation errors or flash on the same page — replace document.
+            document.open();
+            document.write(xhr.responseText);
+            document.close();
+        });
+
+        xhr.addEventListener('error', () => {
+            stop();
+            showUploadProgressError(
+                form,
+                'Upload fehlgeschlagen. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.'
+            );
+        });
+
+        xhr.addEventListener('abort', stop);
+
+        xhr.send(new FormData(form));
     };
 
     const initUploadProgress = () => {
         document.querySelectorAll('form[data-upload-with-progress]').forEach(form => {
             const ui = createUploadProgressUi(form);
-
-            const resetUi = () => {
-                ui.root.classList.add('is-hidden');
-                ui.bar.classList.remove('is-indeterminate');
-                ui.bar.style.width = '0%';
-                ui.percent.textContent = '0%';
-                ui.label.textContent = 'Wird hochgeladen…';
-                form.querySelector('.upload-progress-error')?.remove();
-            };
-
-            const showUi = () => {
-                ui.root.classList.remove('is-hidden');
-                form.querySelector('.upload-progress-error')?.remove();
-            };
 
             form.addEventListener('submit', (event) => {
                 if (!formHasSelectedFiles(form)) {
@@ -821,124 +884,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Originals above the hard cap cannot be stored at all; the
-                // server would reject them, so fail fast before uploading.
-                const tooBig = Array.from(form.querySelectorAll('input[type="file"]'))
-                    .some(input => Array.from(input.files || []).some(file => file.size > MAX_ORIGINAL_BYTES));
-                if (tooBig) {
-                    showUploadProgressError(
-                        form,
-                        'Das ausgewählte Bild ist größer als 25 MB und kann nicht hochgeladen werden. Bitte verkleinern Sie es.'
-                    );
-                    return;
-                }
-
-                // Whether the selected image exceeds the stored limit and will
-                // therefore be downscaled on the server after the upload.
-                const willDownscale = Array.from(form.querySelectorAll('input[type="file"]'))
-                    .some(input => Array.from(input.files || []).some(file => file.size > MAX_IMAGE_BYTES));
-
-                syncWysiwygFields(form);
-
-                const submitButton = form.querySelector('[type="submit"]');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                }
-
-                showUi();
-                ui.label.textContent = 'Dateien werden hochgeladen…';
-
-                const formData = new FormData(form);
-                const xhr = new XMLHttpRequest();
-                xhr.open(form.method || 'POST', form.action);
-
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (!e.lengthComputable) {
-                        ui.bar.classList.add('is-indeterminate');
-                        ui.percent.textContent = 'Upload läuft…';
-                        return;
-                    }
-
-                    ui.bar.classList.remove('is-indeterminate');
-                    const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
-                    ui.bar.style.width = percent + '%';
-                    ui.percent.textContent = percent + '%';
-
-                    if (percent >= 100) {
-                        ui.label.textContent = willDownscale
-                            ? 'Wird verkleinert…'
-                            : 'Wird auf dem Server verarbeitet…';
-                    }
-                });
-
-                xhr.addEventListener('load', () => {
-                    resetUi();
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
-
-                    if (xhr.status === 413) {
-                        showUploadProgressError(
-                            form,
-                            'Der Upload war zu groß. Bitte ein kleineres Bild wählen (max. 25 MB).'
-                        );
-                        return;
-                    }
-
-                    if (xhr.status === 0) {
-                        showUploadProgressError(
-                            form,
-                            'Verbindung unterbrochen. Bitte erneut versuchen.'
-                        );
-                        return;
-                    }
-
-                    if (xhr.status >= 500) {
-                        showUploadProgressError(
-                            form,
-                            'Serverfehler beim Hochladen. Bitte später erneut versuchen.'
-                        );
-                        return;
-                    }
-
-                    const responsePath = new URL(xhr.responseURL).pathname;
-                    const formPath = new URL(form.action, window.location.origin).pathname;
-
-                    if (responsePath !== formPath) {
-                        window.location.href = xhr.responseURL;
-                        return;
-                    }
-
-                    // Validation errors or flash on the same page — replace document.
-                    document.open();
-                    document.write(xhr.responseText);
-                    document.close();
-                });
-
-                xhr.addEventListener('error', () => {
-                    resetUi();
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
-                    showUploadProgressError(
-                        form,
-                        'Upload fehlgeschlagen. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.'
-                    );
-                });
-
-                xhr.addEventListener('abort', () => {
-                    resetUi();
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
-                });
-
-                xhr.send(formData);
+                submitFormWithProgress(form, ui);
             });
         });
     };
 
-    // Run initializations
     initThemeToggle();
     initSortableList();
     initListFilters();
