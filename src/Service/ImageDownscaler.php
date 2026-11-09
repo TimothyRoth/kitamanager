@@ -193,14 +193,16 @@ class ImageDownscaler
             default => 0,
         };
 
-        if (0 !== $angle) {
-            $rotated = imagerotate($image, $angle, 0);
-            if (false !== $rotated) {
-                return $rotated;
-            }
+        if (0 === $angle) {
+            return $image;
         }
 
-        return $image;
+        $rotated = imagerotate($image, $angle, 0);
+        if (false === $rotated) {
+            throw new ImageDownscaleException('Das Bild konnte nicht gedreht werden. Bitte drehen Sie es selbst und laden Sie es erneut hoch.');
+        }
+
+        return $rotated;
     }
 
     /**
