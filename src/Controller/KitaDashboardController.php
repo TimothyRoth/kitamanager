@@ -39,7 +39,8 @@ final class KitaDashboardController extends ManagementController
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
-        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater)) {
+        $passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater);
+        if (null !== $passwordChanged) {
             return $passwordChanged;
         }
 

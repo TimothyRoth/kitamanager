@@ -44,7 +44,8 @@ final class AdminDashboardController extends ManagementController
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
-        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $this->passwordUpdater)) {
+        $passwordChanged = $this->changeOwnPassword($passwordForm, $this->passwordUpdater);
+        if (null !== $passwordChanged) {
             return $passwordChanged;
         }
 
