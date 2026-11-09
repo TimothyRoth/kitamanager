@@ -88,6 +88,24 @@ final class ContentLifecycleTest extends AppWebTestCase
         );
     }
 
+    public function testSavingAnArticleFromTheUploadScriptKeepsTheJumpAndTheMessage(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-article');
+        $form = $crawler->selectButton('Speichern')->form([
+            'content[title]' => 'Hallo Kita',
+            'content[content]' => 'Artikeltext',
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('article.jpg'));
+
+        $this->client->submit($form, [], ['HTTP_X-Requested-With' => 'XMLHttpRequest']);
+
+        self::assertResponseStatusCodeSame(204);
+        self::assertResponseHeaderSame('X-Redirect-To', '/management/user#mein-slider');
+        $this->client->request('GET', '/management/user');
+        self::assertSelectorTextContains('.alert-success', 'Artikel erfolgreich erstellt!');
+    }
+
     public function testCreateArticleRequiresTitleAndBody(): void
     {
         $this->client->loginUser($this->kitaA);

@@ -792,6 +792,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const xhr = new XMLHttpRequest();
         xhr.open(form.method || 'POST', form.action);
+        // Makes the server name the target of a redirect in a header: this
+        // request would follow a real one unseen and lose its #fragment.
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
         xhr.upload.addEventListener('progress', (e) => {
             if (!e.lengthComputable) {
@@ -838,10 +841,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // The request has already followed any redirect and fetched the page
-            // behind it, including messages that are shown only once. Loading
-            // that page a second time would lose them, so show this answer.
-            history.replaceState(null, '', xhr.responseURL);
+            const redirectTarget = xhr.getResponseHeader('X-Redirect-To');
+            if (redirectTarget) {
+                window.location.href = redirectTarget;
+                return;
+            }
+
+            // The form came back with its error messages: show that answer.
             document.open();
             document.write(xhr.responseText);
             document.close();
