@@ -25,7 +25,7 @@
             }}) }}
             {{ form_widget(form) }}
             <button type="submit" class="btn btn-primary btn-large">
-                {{ attribute(form.imageFile.vars.attr, 'multiple') is defined ? 'Fotos hochladen' : 'Speichern' }}
+                {{ submit_label }}
             </button>
             {{ form_end(form) }}
         </section>

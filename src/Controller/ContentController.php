@@ -108,6 +108,7 @@ final class ContentController extends ManagementController
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
             'page_title' => 'Neue Fotos hinzufügen',
+            'submit_label' => 'Fotos hochladen',
         ], new Response(null, $this->statusFor($form)));
     }
 
@@ -258,6 +259,7 @@ final class ContentController extends ManagementController
         return $this->render('management/create_content.html.twig', [
             'form' => $form->createView(),
             'page_title' => 'Neuen Artikel erstellen',
+            'submit_label' => 'Speichern',
         ], new Response(null, $this->statusFor($form)));
     }
 
