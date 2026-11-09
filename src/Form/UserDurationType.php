@@ -7,7 +7,6 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Range;
 
 class UserDurationType extends AbstractType
@@ -17,8 +16,10 @@ class UserDurationType extends AbstractType
         $builder
             ->add('durationBetweenSlides', IntegerType::class, [
                 'label' => 'Dauer zwischen den Slides (in Sekunden)',
+                // An empty field would arrive as null, which cannot be mapped
+                // onto the int property; as 0 it is answered by the range message.
+                'empty_data' => '0',
                 'constraints' => [
-                    new NotBlank(),
                     new Range(
                         min: 1,
                         max: 60,

@@ -327,6 +327,23 @@ final class ContentLifecycleTest extends AppWebTestCase
         self::assertSame(10, $reloaded->getDurationBetweenSlides());
     }
 
+    public function testEmptyDurationIsRejected(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user');
+        $form = $crawler->selectButton('Dauer speichern')->form([
+            'user_duration[durationBetweenSlides]' => '',
+        ]);
+        $crawler = $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('Die Dauer muss zwischen 1 und 60 Sekunden liegen.', $crawler->filter('.form-errors')->text());
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($this->kitaA->getId());
+        self::assertSame(10, $reloaded->getDurationBetweenSlides());
+    }
+
     public function testWrongCurrentPasswordIsRejected(): void
     {
         $this->client->loginUser($this->kitaA);
