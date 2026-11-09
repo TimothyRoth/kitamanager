@@ -8,6 +8,7 @@ use App\Form\UserDevicePinType;
 use App\Form\UserType;
 use App\Repository\ContentRepository;
 use App\Repository\UserRepository;
+use App\Security\Dashboard;
 use App\Service\AudienceSynchronizer;
 use App\Service\DevicePinAssigner;
 use App\Service\UserPasswordUpdater;
@@ -25,14 +26,25 @@ final class AdminDashboardController extends ManagementController
 {
     private const USERNAME_TAKEN = 'Ein Benutzer mit diesem oder einem sehr ähnlichen Namen existiert bereits. Wählen Sie bitte einen anderen.';
 
+    public function __construct(
+        Dashboard $dashboard,
+        EntityManagerInterface $entityManager,
+        private readonly UserPasswordUpdater $passwordUpdater,
+        private readonly UserRepository $userRepository,
+        private readonly AudienceSynchronizer $audienceSynchronizer,
+        private readonly LoggerInterface $logger,
+    ) {
+        parent::__construct($dashboard, $entityManager);
+    }
+
     #[Route('/admin', name: 'app_management_admin')]
     #[IsGranted('ROLE_ADMIN')]
-    public function adminAction(Request $request, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, UserRepository $userRepository, ContentRepository $contentRepository, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function adminAction(Request $request, ContentRepository $contentRepository): Response
     {
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
-        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater, $entityManager)) {
+        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $this->passwordUpdater)) {
             return $passwordChanged;
         }
 
@@ -42,16 +54,16 @@ final class AdminDashboardController extends ManagementController
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $passwordUpdater->update($user, $form->get('plainPassword')->getData());
+                $this->passwordUpdater->update($user, $form->get('plainPassword')->getData());
                 $user->setRoles(['ROLE_USER']);
 
-                $entityManager->persist($user);
-                $entityManager->flush();
+                $this->entityManager->persist($user);
+                $this->entityManager->flush();
 
                 // Deliver existing "publish to all" content from other creators
                 // to the freshly created consumer.
-                $audienceSynchronizer->onUserCreated($user);
-                $entityManager->flush();
+                $this->audienceSynchronizer->onUserCreated($user);
+                $this->entityManager->flush();
 
                 $this->addFlash('success', 'Benutzer wurde erfolgreich hinzugefügt.');
 
@@ -60,7 +72,7 @@ final class AdminDashboardController extends ManagementController
             } catch (UniqueConstraintViolationException $e) {
                 $form->get('username')->addError(new FormError(self::USERNAME_TAKEN));
             } catch (\Exception $e) {
-                $logger->error('Creating a user failed.', ['exception' => $e]);
+                $this->logger->error('Creating a user failed.', ['exception' => $e]);
                 $this->addFlash('danger', 'Beim Anlegen des Benutzers gab es einen unerwarteten Fehler.');
             }
         }
@@ -69,7 +81,7 @@ final class AdminDashboardController extends ManagementController
         $admin = $this->getUser();
 
         return $this->render('management/admin.html.twig', [
-            'users' => $userRepository->getUsersByRole('ROLE_USER'),
+            'users' => $this->userRepository->getUsersByRole('ROLE_USER'),
             'contents' => $contentRepository->findByCreator($admin),
             'form' => $form->createView(),
             'passwordForm' => $passwordForm->createView(),
@@ -78,18 +90,18 @@ final class AdminDashboardController extends ManagementController
 
     #[Route('/admin/edit-user/{id}', name: 'app_management_edit_user')]
     #[IsGranted('ROLE_ADMIN')]
-    public function editUser(Request $request, User $user, UserPasswordUpdater $passwordUpdater, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function editUser(Request $request, User $user): Response
     {
         // Capture the allowed targets before the form changes them, so we can
         // retract content for targets that get removed.
-        $oldAllowedIds = $audienceSynchronizer->resolveAllowedTargetIds($user);
+        $oldAllowedIds = $this->audienceSynchronizer->resolveAllowedTargetIds($user);
 
         $devicePinForm = $this->createForm(UserDevicePinType::class, $user);
         $devicePinForm->handleRequest($request);
 
         if ($devicePinForm->isSubmitted() && $devicePinForm->isValid()) {
             try {
-                $entityManager->flush();
+                $this->entityManager->flush();
                 $this->addFlash('success', $user->getDevicePin()
                     ? 'Die Fernseher-PIN wurde gespeichert. Geben Sie sie jetzt auf dem Fernseher ein.'
                     : 'Die Fernseher-PIN wurde entfernt. Verbundene Fernseher verlieren ihre Zuordnung.');
@@ -105,12 +117,12 @@ final class AdminDashboardController extends ManagementController
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $passwordUpdater->update($user, $form->get('plainPassword')->getData());
+                $this->passwordUpdater->update($user, $form->get('plainPassword')->getData());
 
-                $entityManager->flush();
+                $this->entityManager->flush();
 
-                $audienceSynchronizer->syncCreatorTargets($user, $oldAllowedIds);
-                $entityManager->flush();
+                $this->audienceSynchronizer->syncCreatorTargets($user, $oldAllowedIds);
+                $this->entityManager->flush();
 
                 $this->addFlash('success', 'Der Benutzer wurde erfolgreich aktualisiert.');
 
@@ -119,7 +131,7 @@ final class AdminDashboardController extends ManagementController
             } catch (UniqueConstraintViolationException $e) {
                 $form->get('username')->addError(new FormError(self::USERNAME_TAKEN));
             } catch (\Exception $e) {
-                $logger->error('Updating a user failed.', ['exception' => $e]);
+                $this->logger->error('Updating a user failed.', ['exception' => $e]);
                 $this->addFlash('danger', 'Beim Aktualisieren des Benutzers gab es einen unerwarteten Fehler.');
             }
         }
@@ -133,15 +145,15 @@ final class AdminDashboardController extends ManagementController
 
     #[Route('/admin/delete-user/{id}', name: 'app_management_delete_user', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function deleteUser(Request $request, User $user, EntityManagerInterface $entityManager): Response
+    public function deleteUser(Request $request, User $user): Response
     {
         if ($user->isAdmin()) {
             throw $this->createAccessDeniedException();
         }
 
         if ($this->isCsrfTokenValid('delete' . $user->getId(), $request->request->get('_token'))) {
-            $entityManager->remove($user);
-            $entityManager->flush();
+            $this->entityManager->remove($user);
+            $this->entityManager->flush();
             $this->addFlash('success', 'Benutzer wurde erfolgreich entfernt.');
         } else {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
@@ -152,7 +164,7 @@ final class AdminDashboardController extends ManagementController
 
     #[Route('/admin/reset-device-pins', name: 'app_management_reset_device_pins', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function resetDevicePins(Request $request, UserRepository $userRepository, DevicePinAssigner $pinAssigner, EntityManagerInterface $entityManager): Response
+    public function resetDevicePins(Request $request, DevicePinAssigner $pinAssigner): Response
     {
         if (!$this->isCsrfTokenValid('reset-device-pins', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
@@ -160,7 +172,7 @@ final class AdminDashboardController extends ManagementController
             return $this->redirectToRoute('app_management_admin');
         }
 
-        $kitas = $this->selectedKitas($request, $userRepository);
+        $kitas = $this->selectedKitas($request);
         if ([] === $kitas) {
             $this->addFlash('danger', 'Es wurden keine Kitas ausgewählt.');
 
@@ -168,7 +180,7 @@ final class AdminDashboardController extends ManagementController
         }
 
         $pinAssigner->assignNewPins($kitas);
-        $entityManager->flush();
+        $this->entityManager->flush();
         $this->addFlash('success', sprintf(
             '%d Kita(s) haben eine neue Fernseher-PIN erhalten. Bereits verbundene Fernseher zeigen wieder die PIN-Eingabe.',
             count($kitas),
@@ -179,7 +191,7 @@ final class AdminDashboardController extends ManagementController
 
     #[Route('/admin/delete-users', name: 'app_management_delete_users', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function deleteUsers(Request $request, UserRepository $userRepository, EntityManagerInterface $entityManager): Response
+    public function deleteUsers(Request $request): Response
     {
         if (!$this->isCsrfTokenValid('delete-users', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
@@ -187,7 +199,7 @@ final class AdminDashboardController extends ManagementController
             return $this->redirectToRoute('app_management_admin');
         }
 
-        $kitas = $this->selectedKitas($request, $userRepository);
+        $kitas = $this->selectedKitas($request);
         if ([] === $kitas) {
             $this->addFlash('danger', 'Es wurden keine Kitas ausgewählt.');
 
@@ -195,9 +207,9 @@ final class AdminDashboardController extends ManagementController
         }
 
         foreach ($kitas as $kita) {
-            $entityManager->remove($kita);
+            $this->entityManager->remove($kita);
         }
-        $entityManager->flush();
+        $this->entityManager->flush();
         $this->addFlash('success', sprintf('%d Kita(s) wurden mitsamt all ihrer Beiträge gelöscht.', count($kitas)));
 
         return $this->redirectToRoute('app_management_admin');
@@ -208,7 +220,7 @@ final class AdminDashboardController extends ManagementController
      *
      * @return list<User>
      */
-    private function selectedKitas(Request $request, UserRepository $userRepository): array
+    private function selectedKitas(Request $request): array
     {
         $ids = $request->request->all('ids');
         if ([] === $ids) {
@@ -216,7 +228,7 @@ final class AdminDashboardController extends ManagementController
         }
 
         return array_values(array_filter(
-            $userRepository->findBy(['id' => $ids]),
+            $this->userRepository->findBy(['id' => $ids]),
             fn (User $user) => !$user->isAdmin(),
         ));
     }

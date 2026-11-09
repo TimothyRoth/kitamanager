@@ -8,6 +8,7 @@ use App\Form\ContentType as ContentFormType;
 use App\Enum\ContentType as eContentType;
 use App\Repository\ContentRepository;
 use App\Repository\SliderItemRepository;
+use App\Security\Dashboard;
 use App\Service\AudienceSynchronizer;
 use App\Service\ContentPublisher;
 use App\Service\ImageDownscaleException;
@@ -29,8 +30,19 @@ final class ContentController extends ManagementController
 {
     private const IMAGE_NOT_STORED = 'Beim Speichern des Bildes gab es einen unerwarteten Fehler.';
 
+    public function __construct(
+        Dashboard $dashboard,
+        EntityManagerInterface $entityManager,
+        private readonly ImageDownscaler $imageDownscaler,
+        private readonly ContentPublisher $contentPublisher,
+        private readonly AudienceSynchronizer $audienceSynchronizer,
+        private readonly LoggerInterface $logger,
+    ) {
+        parent::__construct($dashboard, $entityManager);
+    }
+
     #[Route('/user/create-image', name: 'app_management_create_image')]
-    public function createImage(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function createImage(Request $request): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB pro Bild – bitte laden Sie weniger Bilder gleichzeitig hoch.');
@@ -40,7 +52,7 @@ final class ContentController extends ManagementController
 
         /** @var User $creator */
         $creator = $this->getUser();
-        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+        $allowed = $this->audienceSynchronizer->allowedTargetUsers($creator);
 
         $content = new Content();
         $form = $this->createForm(ContentFormType::class, $content, [
@@ -61,7 +73,7 @@ final class ContentController extends ManagementController
             foreach ($imageFiles as $imageFile) {
                 // No-JS fallback path: downscale oversized images here as well.
                 try {
-                    $imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
+                    $this->imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
                 } catch (ImageDownscaleException $e) {
                     $failed[] = $imageFile->getClientOriginalName() . ': ' . $e->getMessage();
                     continue;
@@ -71,9 +83,9 @@ final class ContentController extends ManagementController
                 // so a failure leaves nothing half-stored behind it.
                 try {
                     $image = (new Content())->setType(eContentType::IMAGE)->setCreator($creator);
-                    $contentPublisher->publish($image, $imageFile, $audienceIds, $audienceAll);
+                    $this->contentPublisher->publish($image, $imageFile, $audienceIds, $audienceAll);
                 } catch (\Exception $e) {
-                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $this->logger->error('Storing an uploaded image failed.', ['exception' => $e]);
                     $failed[] = self::IMAGE_NOT_STORED;
                     break;
                 }
@@ -107,7 +119,7 @@ final class ContentController extends ManagementController
      */
     #[Route('/user/upload-image', name: 'app_management_upload_image', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function uploadImage(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, LoggerInterface $logger): JsonResponse
+    public function uploadImage(Request $request): JsonResponse
     {
         // Body exceeded post_max_size: PHP dropped the whole request payload.
         if ($this->isTruncatedUpload($request)) {
@@ -144,7 +156,7 @@ final class ContentController extends ManagementController
         }
 
         try {
-            $downscaled = $imageDownscaler->prepareForTvIfNeeded($file->getPathname());
+            $downscaled = $this->imageDownscaler->prepareForTvIfNeeded($file->getPathname());
         } catch (ImageDownscaleException $e) {
             return $this->uploadError($e->getMessage());
         }
@@ -157,9 +169,9 @@ final class ContentController extends ManagementController
 
         try {
             $image = (new Content())->setType(eContentType::IMAGE)->setCreator($creator);
-            $contentPublisher->publish($image, $file, $audienceIds, $audienceAll);
+            $this->contentPublisher->publish($image, $file, $audienceIds, $audienceAll);
         } catch (\Exception $e) {
-            $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+            $this->logger->error('Storing an uploaded image failed.', ['exception' => $e]);
 
             return $this->uploadError(self::IMAGE_NOT_STORED, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -188,10 +200,10 @@ final class ContentController extends ManagementController
      * the user-facing message is attached to the form's imageFile field.
      * Returns true when the file is ready to be stored.
      */
-    private function downscaleOrAddError(ImageDownscaler $imageDownscaler, UploadedFile $imageFile, FormInterface $form): bool
+    private function downscaleOrAddError(UploadedFile $imageFile, FormInterface $form): bool
     {
         try {
-            $imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
+            $this->imageDownscaler->prepareForTvIfNeeded($imageFile->getPathname());
 
             return true;
         } catch (ImageDownscaleException $e) {
@@ -202,7 +214,7 @@ final class ContentController extends ManagementController
     }
 
     #[Route('/user/create-article', name: 'app_management_create_article')]
-    public function createArticle(Request $request, ImageDownscaler $imageDownscaler, ContentPublisher $contentPublisher, AudienceSynchronizer $audienceSynchronizer, LoggerInterface $logger): Response
+    public function createArticle(Request $request): Response
     {
         if ($this->isTruncatedUpload($request)) {
             $this->addFlash('danger', 'Der Upload war zu groß. Erlaubt sind max. 25 MB für das Bild.');
@@ -212,7 +224,7 @@ final class ContentController extends ManagementController
 
         /** @var User $creator */
         $creator = $this->getUser();
-        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+        $allowed = $this->audienceSynchronizer->allowedTargetUsers($creator);
 
         $content = new Content();
         $form = $this->createForm(ContentFormType::class, $content, [
@@ -226,18 +238,18 @@ final class ContentController extends ManagementController
             /** @var UploadedFile $imageFile */
             $imageFile = $form->get('imageFile')->getData();
 
-            if ($this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
+            if ($this->downscaleOrAddError($imageFile, $form)) {
                 try {
                     $content->setType(eContentType::ARTICLE);
                     $content->setCreator($creator);
                     ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                    $contentPublisher->publish($content, $imageFile, $audienceIds, $audienceAll);
+                    $this->contentPublisher->publish($content, $imageFile, $audienceIds, $audienceAll);
 
                     $this->addFlash('success', 'Artikel erfolgreich erstellt!');
 
                     return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
                 } catch (\Exception $e) {
-                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $this->logger->error('Storing an uploaded image failed.', ['exception' => $e]);
                     $this->addFlash('danger', self::IMAGE_NOT_STORED);
                 }
             }
@@ -250,7 +262,7 @@ final class ContentController extends ManagementController
     }
 
     #[Route('/user/edit-content/{id}', name: 'app_management_edit_content')]
-    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, ImageDownscaler $imageDownscaler, EntityManagerInterface $entityManager, AudienceSynchronizer $audienceSynchronizer, SliderItemRepository $sliderItemRepository, LoggerInterface $logger): Response
+    public function editContent(Request $request, Content $content, ImageUploader $imageUploader, SliderItemRepository $sliderItemRepository): Response
     {
         $this->denyAccessUnlessGranted('EDIT', $content);
 
@@ -261,7 +273,7 @@ final class ContentController extends ManagementController
         }
 
         $creator = $content->getCreator();
-        $allowed = $audienceSynchronizer->allowedTargetUsers($creator);
+        $allowed = $this->audienceSynchronizer->allowedTargetUsers($creator);
         $allowedIds = array_map(static fn (User $u) => $u->getId(), $allowed);
 
         // Pre-select consumers that currently receive this content (excluding the creator).
@@ -287,7 +299,7 @@ final class ContentController extends ManagementController
             /** @var UploadedFile|null $imageFile */
             $imageFile = $form->get('imageFile')->getData();
 
-            if (null === $imageFile || $this->downscaleOrAddError($imageDownscaler, $imageFile, $form)) {
+            if (null === $imageFile || $this->downscaleOrAddError($imageFile, $form)) {
                 try {
                     $replacedImageUrl = null;
                     if ($imageFile) {
@@ -295,20 +307,20 @@ final class ContentController extends ManagementController
                         $content->setImageUrl($imageUploader->upload($imageFile, $creator->getId()));
                     }
 
-                    $entityManager->flush();
+                    $this->entityManager->flush();
                     $imageUploader->delete($replacedImageUrl);
 
                     if ($form->has('audience')) {
                         ['ids' => $audienceIds, 'all' => $audienceAll] = $this->extractAudience($form);
-                        $audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
-                        $entityManager->flush();
+                        $this->audienceSynchronizer->syncContentAudience($content, $audienceIds, $audienceAll);
+                        $this->entityManager->flush();
                     }
 
                     $this->addFlash('success', 'Inhalt erfolgreich aktualisiert!');
 
                     return $this->redirectToRoute('app_management_user', ['_fragment' => 'mein-slider']);
                 } catch (\Exception $e) {
-                    $logger->error('Storing an uploaded image failed.', ['exception' => $e]);
+                    $this->logger->error('Storing an uploaded image failed.', ['exception' => $e]);
                     $this->addFlash('danger', self::IMAGE_NOT_STORED);
                 }
             }
@@ -322,13 +334,13 @@ final class ContentController extends ManagementController
     }
 
     #[Route('/user/delete-content/{id}', name: 'app_management_delete_content', methods: ['POST'])]
-    public function deleteContent(Request $request, Content $content, EntityManagerInterface $entityManager): Response
+    public function deleteContent(Request $request, Content $content): Response
     {
         $this->denyAccessUnlessGranted('DELETE', $content);
 
         if ($this->isCsrfTokenValid('delete' . $content->getId(), $request->request->get('_token'))) {
-            $entityManager->remove($content);
-            $entityManager->flush();
+            $this->entityManager->remove($content);
+            $this->entityManager->flush();
             $this->addFlash('success', 'Inhalt erfolgreich gelöscht!');
         } else {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
@@ -339,7 +351,7 @@ final class ContentController extends ManagementController
 
     #[Route('/content/bulk-delete', name: 'app_management_bulk_delete_content', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function bulkDeleteContent(Request $request, EntityManagerInterface $entityManager, ContentRepository $contentRepository): Response
+    public function bulkDeleteContent(Request $request, ContentRepository $contentRepository): Response
     {
         if (!$this->isCsrfTokenValid('bulk-delete', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
@@ -356,12 +368,12 @@ final class ContentController extends ManagementController
                 continue;
             }
 
-            $entityManager->remove($content);
+            $this->entityManager->remove($content);
             $deleted++;
         }
 
         if ($deleted > 0) {
-            $entityManager->flush();
+            $this->entityManager->flush();
             $this->addFlash('success', sprintf('%d Inhalt(e) erfolgreich gelöscht.', $deleted));
         } else {
             $this->addFlash('danger', 'Es wurden keine Inhalte gelöscht.');

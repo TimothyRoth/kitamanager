@@ -10,7 +10,6 @@ use App\Repository\ContentRepository;
 use App\Repository\SliderItemRepository;
 use App\Service\SliderOrder;
 use App\Service\UserPasswordUpdater;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +21,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class KitaDashboardController extends ManagementController
 {
     #[Route('/user', name: 'app_management_user')]
-    public function userAction(Request $request, EntityManagerInterface $entityManager, UserPasswordUpdater $passwordUpdater, ContentRepository $contentRepository, SliderItemRepository $sliderItemRepository): Response
+    public function userAction(Request $request, UserPasswordUpdater $passwordUpdater, ContentRepository $contentRepository, SliderItemRepository $sliderItemRepository): Response
     {
         /** @var User $user */
         $user = $this->getUser();
@@ -31,7 +30,7 @@ final class KitaDashboardController extends ManagementController
         $durationForm->handleRequest($request);
 
         if ($durationForm->isSubmitted() && $durationForm->isValid()) {
-            $entityManager->flush();
+            $this->entityManager->flush();
             $this->addFlash('success', 'Die Anzeigedauer wurde erfolgreich aktualisiert.');
 
             return $this->redirectToRoute('app_management_user');
@@ -40,7 +39,7 @@ final class KitaDashboardController extends ManagementController
         $passwordForm = $this->createForm(ChangePasswordType::class);
         $passwordForm->handleRequest($request);
 
-        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater, $entityManager)) {
+        if ($passwordChanged = $this->changeOwnPassword($passwordForm, $passwordUpdater)) {
             return $passwordChanged;
         }
 
@@ -60,7 +59,7 @@ final class KitaDashboardController extends ManagementController
 
     #[Route('/slider-item/reorder', name: 'app_management_slider_reorder', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function reorderSlider(Request $request, SliderOrder $sliderOrder, EntityManagerInterface $entityManager): Response
+    public function reorderSlider(Request $request, SliderOrder $sliderOrder): Response
     {
         if (!$this->isCsrfTokenValid('reorder-slider', $request->request->getString('_token'))) {
             throw $this->createAccessDeniedException();
@@ -69,20 +68,20 @@ final class KitaDashboardController extends ManagementController
         /** @var User $consumer */
         $consumer = $this->getUser();
         $sliderOrder->arrange($consumer, array_map('intval', $request->request->all('ids')));
-        $entityManager->flush();
+        $this->entityManager->flush();
 
         return new Response(null, Response::HTTP_NO_CONTENT);
     }
 
     #[Route('/slider-item/{id}/toggle-status', name: 'app_management_slider_toggle_status', methods: ['POST'])]
-    public function toggleSliderItemStatus(Request $request, SliderItem $item, EntityManagerInterface $entityManager): Response
+    public function toggleSliderItemStatus(Request $request, SliderItem $item): Response
     {
         // Only the creator may activate/deactivate; assigned foreign content stays fixed.
         $this->denyAccessUnlessGranted('TOGGLE', $item);
 
         if ($this->isCsrfTokenValid('toggle-status' . $item->getId(), $request->request->get('_token'))) {
             $item->setIsEnabled(!$item->isEnabled());
-            $entityManager->flush();
+            $this->entityManager->flush();
 
             $status = $item->isEnabled() ? 'aktiviert' : 'deaktiviert';
             $this->addFlash('success', "Inhalt wurde erfolgreich {$status}.");
