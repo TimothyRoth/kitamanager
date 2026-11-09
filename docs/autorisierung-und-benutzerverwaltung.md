@@ -197,6 +197,7 @@ classDiagram
 - [ ] `/slider/display`: korrekte PIN führt zum Slider der richtigen Kita.
 - [ ] Ein bereits gekoppeltes Gerät landet beim erneuten Aufruf von `/slider/display` direkt im Slider.
 - [ ] Falsche PIN wird abgelehnt.
+- [ ] Eine Slider-Adresse, die zu keiner Kita gehört (z. B. `/slider/gibt-es-nicht`), antwortet mit "Seite nicht gefunden" (404), angemeldet wie unangemeldet. `/slider` ohne Namen zeigt Angemeldeten den eigenen Slider.
 - [ ] Ändert/entfernt der Admin die PIN, zeigt das gekoppelte TV wieder die PIN-Eingabe ("unlinked").
 - [ ] Slider zeigt unten rechts den Namen der Kita, deren Inhalte laufen (nicht die PIN).
 - [ ] Admin sieht in der Benutzerliste und beim Bearbeiten, ob/mit welcher PIN der Slider erreichbar ist.

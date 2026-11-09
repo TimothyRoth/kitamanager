@@ -953,6 +953,39 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
+    public function testUnknownSliderAddressIsNotFound(): void
+    {
+        $this->client->request('GET', '/slider/gibt-es-nicht');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testUnknownSliderAddressIsNotFoundForALoggedInKitaEither(): void
+    {
+        $this->client->loginUser($this->kitaA);
+
+        $this->client->request('GET', '/slider/gibt-es-nicht');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testSliderAddressWithoutANameShowsTheOwnSlider(): void
+    {
+        $this->client->loginUser($this->kitaA);
+
+        $crawler = $this->client->request('GET', '/slider');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('kita-a', $crawler->filter('.tv-watermark')->text());
+    }
+
+    public function testSliderAddressWithoutANameNeedsALogin(): void
+    {
+        $this->client->request('GET', '/slider');
+
+        self::assertResponseRedirects('/admin');
+    }
+
     public function testLoggedInPreviewIsNotBoundToAPinEnteredEarlier(): void
     {
         $this->client->request('POST', '/slider/display', ['pin' => '1111']);

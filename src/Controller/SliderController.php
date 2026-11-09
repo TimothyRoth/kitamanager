@@ -76,8 +76,12 @@ final class SliderController extends AbstractController
     }
 
     #[Route('/slider/{slug?}', name: 'app_slider')]
-    public function index(?User $user, SliderItemRepository $sliderItemRepository): Response
+    public function index(?string $slug, ?User $user, SliderItemRepository $sliderItemRepository): Response
     {
+        if (null !== $slug && null === $user) {
+            throw $this->createNotFoundException();
+        }
+
         if (!$user) {
             /** @var User|null $user */
             $user = $this->getUser();
