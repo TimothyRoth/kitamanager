@@ -75,6 +75,24 @@ class ImageDownscaler
      */
     public function prepareForTv(string $path): void
     {
+        $mime = $this->mimeOfPreparableImage($path);
+        $source = $this->decodeUpright($path, $mime);
+
+        // Keep transparent PNGs as PNG; opaque PNGs become JPEG (much smaller).
+        $keepPngAlpha = 'image/png' === $mime && $this->pngHasAlphaChannel($path);
+        $encoded = $this->encodeWithinLimit($source, $keepPngAlpha);
+
+        if (false === @file_put_contents($path, $encoded)) {
+            throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
+        }
+        clearstatcache(true, $path);
+    }
+
+    /**
+     * @return string 'image/jpeg' or 'image/png'
+     */
+    private function mimeOfPreparableImage(string $path): string
+    {
         $info = @getimagesize($path);
         if (false === $info) {
             throw new ImageDownscaleException('Die Bilddatei konnte nicht gelesen werden. Bitte laden Sie ein gültiges Bild hoch.');
@@ -103,18 +121,24 @@ class ImageDownscaler
             ));
         }
 
+        return $mime;
+    }
+
+    private function decodeUpright(string $path, string $mime): \GdImage
+    {
         $source = 'image/jpeg' === $mime ? @imagecreatefromjpeg($path) : @imagecreatefrompng($path);
         if (false === $source) {
             throw new ImageDownscaleException('Die Bilddatei ist beschädigt und konnte nicht verarbeitet werden.');
         }
 
-        if ('image/jpeg' === $mime) {
-            $source = $this->applyExifOrientation($source, $path);
-        }
+        return 'image/jpeg' === $mime ? $this->applyExifOrientation($source, $path) : $source;
+    }
 
-        // Keep transparent PNGs as PNG; opaque PNGs become JPEG (much smaller).
-        $keepPngAlpha = 'image/png' === $mime && $this->pngHasAlphaChannel($path);
-
+    /**
+     * Shrinks the image step by step until its encoded form fits MAX_BYTES.
+     */
+    private function encodeWithinLimit(\GdImage $source, bool $keepPngAlpha): string
+    {
         $edge = min(self::START_EDGE, max(imagesx($source), imagesy($source)));
 
         while (true) {
@@ -122,12 +146,7 @@ class ImageDownscaler
             $encoded = $this->encode($scaled, $keepPngAlpha);
 
             if (strlen($encoded) <= self::MAX_BYTES) {
-                if (false === @file_put_contents($path, $encoded)) {
-                    throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
-                }
-                clearstatcache(true, $path);
-
-                return;
+                return $encoded;
             }
 
             if ($edge <= self::MIN_EDGE) {
