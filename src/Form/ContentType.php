@@ -28,9 +28,51 @@ class ContentType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $this->addImageField($builder, $options);
+
+        if ($options['is_article']) {
+            $this->addArticleFields($builder);
+        }
+
+        // Audience selection is only shown when the creator may publish to others.
+        if (!empty($options['audience_choices'])) {
+            $this->addAudienceFields($builder, $options);
+        }
+    }
+
+    private function addImageField(FormBuilderInterface $builder, array $options): void
+    {
+        $imageOptions = [
+            'label' => $options['multiple']
+                ? 'Fotos auswählen oder aufnehmen'
+                : 'Bild auswählen oder aufnehmen',
+            'mapped' => false,
+            'multiple' => $options['multiple'],
+            'required' => $options['is_new'],
+            'constraints' => $options['multiple']
+                ? [new All(constraints: [$this->imageConstraint()])]
+                : [$this->imageConstraint()],
+            'attr' => [
+                'accept' => 'image/*',
+            ],
+        ];
+
+        if ($options['multiple']) {
+            $imageOptions['attr']['class'] = 'image-multi-upload';
+            $imageOptions['help'] = 'Tippen Sie hier, um die Kamera zu öffnen oder Fotos aus der Mediathek zu wählen.';
+        } else {
+            // Single-image flows: hint the rear camera when the OS supports it.
+            $imageOptions['attr']['capture'] = 'environment';
+        }
+
+        $builder->add('imageFile', FileType::class, $imageOptions);
+    }
+
+    private function imageConstraint(): Image
+    {
         // Images larger than 3MB are downscaled server-side to the TV limit;
         // only originals above the 25MB hard cap are rejected outright.
-        $imageConstraint = new Image([
+        return new Image([
             'maxSize' => '25M',
             'maxSizeMessage' => 'Die Datei ist zu groß ({{ size }} {{ suffix }}). Erlaubt sind maximal {{ limit }} {{ suffix }}.',
             'mimeTypes' => [
@@ -47,74 +89,50 @@ class ContentType extends AbstractType
             'uploadCantWriteErrorMessage' => 'Die Datei konnte auf dem Server nicht gespeichert werden.',
             'uploadErrorMessage' => 'Beim Hochladen ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es erneut.',
         ]);
+    }
 
-        $imageOptions = [
-            'label' => $options['multiple']
-                ? 'Fotos auswählen oder aufnehmen'
-                : 'Bild auswählen oder aufnehmen',
+    private function addArticleFields(FormBuilderInterface $builder): void
+    {
+        $builder
+            ->add('title', TextType::class, [
+                'label' => 'Titel',
+                'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Titel an.')],
+            ])
+            ->add('content', TextareaType::class, [
+                'label' => 'Inhalt',
+                'attr' => ['class' => 'wysiwyg'],
+                'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Inhalt an.')],
+            ]);
+
+        $builder->get('content')->addModelTransformer(new CallbackTransformer(
+            $this->sanitizeArticleBody(...),
+            $this->sanitizeArticleBody(...),
+        ));
+    }
+
+    private function addAudienceFields(FormBuilderInterface $builder, array $options): void
+    {
+        $builder->add('audienceAll', CheckboxType::class, [
             'mapped' => false,
-            'multiple' => $options['multiple'],
-            'required' => $options['is_new'],
-            'constraints' => $options['multiple']
-                ? [new All(constraints: [$imageConstraint])]
-                : [$imageConstraint],
-            'attr' => [
-                'accept' => 'image/*',
-            ],
-        ];
+            'required' => false,
+            'label' => 'An alle zugewiesenen Kitas ausspielen',
+            'data' => $options['audience_all_default'],
+            'attr' => ['data-audience-all' => ''],
+        ]);
 
-        if ($options['multiple']) {
-            $imageOptions['attr']['class'] = 'image-multi-upload';
-            $imageOptions['help'] = 'Tippen Sie hier, um die Kamera zu öffnen oder Fotos aus der Mediathek zu wählen.';
-        } else {
-            // Single-image flows: hint the rear camera when the OS supports it.
-            $imageOptions['attr']['capture'] = 'environment';
-        }
-
-        $builder->add('imageFile', FileType::class, $imageOptions);
-
-        if ($options['is_article']) {
-            $builder
-                ->add('title', TextType::class, [
-                    'label' => 'Titel',
-                    'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Titel an.')],
-                ])
-                ->add('content', TextareaType::class, [
-                    'label' => 'Inhalt',
-                    'attr' => ['class' => 'wysiwyg'],
-                    'constraints' => [new NotBlank(message: 'Bitte geben Sie einen Inhalt an.')],
-                ]);
-
-            $builder->get('content')->addModelTransformer(new CallbackTransformer(
-                $this->sanitizeArticleBody(...),
-                $this->sanitizeArticleBody(...),
-            ));
-        }
-
-        // Audience selection is only shown when the creator may publish to others.
-        if (!empty($options['audience_choices'])) {
-            $builder->add('audienceAll', CheckboxType::class, [
-                'mapped' => false,
-                'required' => false,
-                'label' => 'An alle zugewiesenen Kitas ausspielen',
-                'data' => $options['audience_all_default'],
-                'attr' => ['data-audience-all' => ''],
-            ]);
-
-            $builder->add('audience', EntityType::class, [
-                'class' => User::class,
-                'mapped' => false,
-                'multiple' => true,
-                'expanded' => true,
-                'required' => false,
-                'label' => 'Sichtbar für ausgewählte Kitas',
-                'help' => 'Suche und wähle die Kitas, die diesen Inhalt im Slider sehen sollen.',
-                'choice_label' => 'username',
-                'choices' => $options['audience_choices'],
-                'data' => $options['audience_selected'],
-                'attr' => ['data-audience-list' => ''],
-            ]);
-        }
+        $builder->add('audience', EntityType::class, [
+            'class' => User::class,
+            'mapped' => false,
+            'multiple' => true,
+            'expanded' => true,
+            'required' => false,
+            'label' => 'Sichtbar für ausgewählte Kitas',
+            'help' => 'Suchen und wählen Sie die Kitas, die diesen Inhalt im Slider sehen sollen.',
+            'choice_label' => 'username',
+            'choices' => $options['audience_choices'],
+            'data' => $options['audience_selected'],
+            'attr' => ['data-audience-list' => ''],
+        ]);
     }
 
     private function sanitizeArticleBody(?string $html): ?string

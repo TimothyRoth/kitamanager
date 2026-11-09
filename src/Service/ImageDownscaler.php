@@ -49,6 +49,22 @@ class ImageDownscaler
     }
 
     /**
+     * @return bool whether the file had to be changed
+     *
+     * @throws ImageDownscaleException with a user-facing German message
+     */
+    public function prepareForTvIfNeeded(string $path): bool
+    {
+        if (!$this->needsTvPreparation($path)) {
+            return false;
+        }
+
+        $this->prepareForTv($path);
+
+        return true;
+    }
+
+    /**
      * Downscale the image at $path in place until it is <= MAX_BYTES.
      * The file may change format (PNG photos are re-encoded as JPEG unless
      * they use transparency); callers that derive the file extension from
@@ -58,6 +74,24 @@ class ImageDownscaler
      * @throws ImageDownscaleException with a user-facing German message
      */
     public function prepareForTv(string $path): void
+    {
+        $mime = $this->mimeOfPreparableImage($path);
+        $source = $this->decodeUpright($path, $mime);
+
+        // Keep transparent PNGs as PNG; opaque PNGs become JPEG (much smaller).
+        $keepPngAlpha = 'image/png' === $mime && $this->pngHasAlphaChannel($path);
+        $encoded = $this->encodeWithinLimit($source, $keepPngAlpha);
+
+        if (false === @file_put_contents($path, $encoded)) {
+            throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
+        }
+        clearstatcache(true, $path);
+    }
+
+    /**
+     * @return string 'image/jpeg' or 'image/png'
+     */
+    private function mimeOfPreparableImage(string $path): string
     {
         $info = @getimagesize($path);
         if (false === $info) {
@@ -87,46 +121,41 @@ class ImageDownscaler
             ));
         }
 
+        return $mime;
+    }
+
+    private function decodeUpright(string $path, string $mime): \GdImage
+    {
         $source = 'image/jpeg' === $mime ? @imagecreatefromjpeg($path) : @imagecreatefrompng($path);
         if (false === $source) {
             throw new ImageDownscaleException('Die Bilddatei ist beschädigt und konnte nicht verarbeitet werden.');
         }
 
-        if ('image/jpeg' === $mime) {
-            $source = $this->applyExifOrientation($source, $path);
-        }
+        return 'image/jpeg' === $mime ? $this->applyExifOrientation($source, $path) : $source;
+    }
 
-        // Keep transparent PNGs as PNG; opaque PNGs become JPEG (much smaller).
-        $keepPngAlpha = 'image/png' === $mime && $this->pngHasAlphaChannel($path);
+    /**
+     * Shrinks the image step by step until its encoded form fits MAX_BYTES.
+     */
+    private function encodeWithinLimit(\GdImage $source, bool $keepPngAlpha): string
+    {
+        $edge = min(self::START_EDGE, max(imagesx($source), imagesy($source)));
 
-        try {
-            $edge = min(self::START_EDGE, max(imagesx($source), imagesy($source)));
+        while (true) {
+            $scaled = $this->scaleToEdge($source, $edge, $keepPngAlpha);
+            $encoded = $this->encode($scaled, $keepPngAlpha);
 
-            while (true) {
-                $scaled = $this->scaleToEdge($source, $edge, $keepPngAlpha);
-                $encoded = $this->encode($scaled, $keepPngAlpha);
-
-                if (strlen($encoded) <= self::MAX_BYTES) {
-                    if (false === @file_put_contents($path, $encoded)) {
-                        throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
-                    }
-                    clearstatcache(true, $path);
-
-                    return;
-                }
-
-                if ($edge <= self::MIN_EDGE) {
-                    // Practically unreachable for JPEG; only extreme
-                    // transparency-heavy PNGs can end up here.
-                    throw new ImageDownscaleException('Das Bild konnte nicht ausreichend verkleinert werden. Bitte verkleinern Sie es selbst.');
-                }
-
-                $edge = max(self::MIN_EDGE, (int) round($edge * 0.75));
+            if (strlen($encoded) <= self::MAX_BYTES) {
+                return $encoded;
             }
-        } finally {
-            // GdImage objects are released by the garbage collector (imagedestroy
-            // is a deprecated no-op since PHP 8.0 / 8.5).
-            unset($source);
+
+            if ($edge <= self::MIN_EDGE) {
+                // Practically unreachable for JPEG; only extreme
+                // transparency-heavy PNGs can end up here.
+                throw new ImageDownscaleException('Das Bild konnte nicht ausreichend verkleinert werden. Bitte verkleinern Sie es selbst.');
+            }
+
+            $edge = max(self::MIN_EDGE, (int) round($edge * 0.75));
         }
     }
 
@@ -199,14 +228,16 @@ class ImageDownscaler
             default => 0,
         };
 
-        if (0 !== $angle) {
-            $rotated = imagerotate($image, $angle, 0);
-            if (false !== $rotated) {
-                return $rotated;
-            }
+        if (0 === $angle) {
+            return $image;
         }
 
-        return $image;
+        $rotated = imagerotate($image, $angle, 0);
+        if (false === $rotated) {
+            throw new ImageDownscaleException('Das Bild konnte nicht gedreht werden. Bitte drehen Sie es selbst und laden Sie es erneut hoch.');
+        }
+
+        return $rotated;
     }
 
     /**

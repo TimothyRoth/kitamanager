@@ -3,6 +3,7 @@
 namespace App\Tests\Service;
 
 use App\Service\ImageUploader;
+use App\Tests\ImageFixturesTrait;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -10,23 +11,24 @@ use Symfony\Component\String\Slugger\AsciiSlugger;
 
 final class ImageUploaderTest extends TestCase
 {
+    use ImageFixturesTrait;
+
     private string $targetDir;
-    private string $tmpDir;
     private ImageUploader $uploader;
 
     protected function setUp(): void
     {
         $this->targetDir = sys_get_temp_dir() . '/km_uploads_' . bin2hex(random_bytes(4));
-        $this->tmpDir = sys_get_temp_dir() . '/km_up_src_' . bin2hex(random_bytes(4));
         mkdir($this->targetDir);
-        mkdir($this->tmpDir);
+        $this->createTempDir();
 
         $this->uploader = new ImageUploader($this->targetDir, new AsciiSlugger(), new Filesystem());
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove([$this->targetDir, $this->tmpDir]);
+        (new Filesystem())->remove($this->targetDir);
+        $this->removeTempDir();
     }
 
     public function testUploadStoresUnderUserDirectoryWithSafeName(): void
@@ -88,14 +90,5 @@ final class ImageUploaderTest extends TestCase
         $this->uploader->deleteUserDirectory(15);
 
         self::assertDirectoryDoesNotExist($dir);
-    }
-
-    private function makeJpeg(string $name): string
-    {
-        $path = $this->tmpDir . '/' . $name;
-        $img = imagecreatetruecolor(20, 10);
-        imagejpeg($img, $path, 90);
-
-        return $path;
     }
 }

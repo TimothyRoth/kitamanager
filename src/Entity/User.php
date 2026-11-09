@@ -202,14 +202,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * @return Collection<int, Content>
-     */
-    public function getContent(): Collection
-    {
-        return $this->content;
-    }
-
-    /**
      * @return Collection<int, User>
      */
     public function getPublishTargets(): Collection

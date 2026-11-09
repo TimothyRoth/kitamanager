@@ -7,9 +7,6 @@ use App\Entity\User;
 use App\Enum\ContentType;
 use App\Service\ImageUploader;
 use App\Tests\AppKernelTestCase;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Ensures Doctrine preRemove hooks delete uploaded files from disk.
@@ -17,7 +14,6 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class ImageDeletionListenerTest extends AppKernelTestCase
 {
-    private EntityManagerInterface $em;
     private ImageUploader $uploader;
     private string $uploadsDir;
     private User $user;
@@ -27,25 +23,14 @@ final class ImageDeletionListenerTest extends AppKernelTestCase
         self::bootKernel();
         $container = static::getContainer();
 
-        $this->em = $container->get('doctrine')->getManager();
         $this->uploader = $container->get(ImageUploader::class);
         $this->uploadsDir = $this->uploader->getTargetDirectory();
 
         if (!is_dir($this->uploadsDir)) {
             mkdir($this->uploadsDir, 0777, true);
         }
-        $meta = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool = new SchemaTool($this->em);
-        $tool->dropSchema($meta);
-        $tool->createSchema($meta);
-
-        $hasher = $container->get(UserPasswordHasherInterface::class);
-        $this->user = new User();
-        $this->user->setUsername('listener-user');
-        $this->user->setRoles(['ROLE_USER']);
-        $this->user->setPassword($hasher->hashPassword($this->user, 'secret'));
-        $this->em->persist($this->user);
-        $this->em->flush();
+        $this->openFreshDatabase();
+        $this->user = $this->makeUser('listener-user');
     }
 
     protected function tearDown(): void

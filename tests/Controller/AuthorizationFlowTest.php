@@ -5,14 +5,10 @@ namespace App\Tests\Controller;
 use App\Entity\Content;
 use App\Entity\SliderItem;
 use App\Entity\User;
-use App\Enum\ContentType;
 use App\Service\AudienceSynchronizer;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
 use App\Tests\AppWebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\DomCrawler\Crawler;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Function tests mapped to docs/autorisierung-und-benutzerverwaltung.md §5.
@@ -20,9 +16,6 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 final class AuthorizationFlowTest extends AppWebTestCase
 {
     private KernelBrowser $client;
-    private EntityManagerInterface $em;
-    private UserPasswordHasherInterface $hasher;
-    private AudienceSynchronizer $audience;
 
     private User $admin;
     private User $kitaA;
@@ -33,84 +26,27 @@ final class AuthorizationFlowTest extends AppWebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $container = static::getContainer();
 
-        $this->em = $container->get('doctrine')->getManager();
-        $this->hasher = $container->get(UserPasswordHasherInterface::class);
-        $this->audience = $container->get(AudienceSynchronizer::class);
-
-        $this->resetSchema();
+        $this->openFreshDatabase();
         $this->seedUsers();
-    }
-
-    private function resetSchema(): void
-    {
-        $meta = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool = new SchemaTool($this->em);
-        $tool->dropSchema($meta);
-        $tool->createSchema($meta);
     }
 
     private function seedUsers(): void
     {
-        $this->admin = $this->makeUser('admin', 'admin-secret', ['ROLE_ADMIN']);
-        $this->kitaA = $this->makeUser('kita-a', 'kita-a-secret', ['ROLE_USER'], '1111');
-        $this->kitaB = $this->makeUser('kita-b', 'kita-b-secret', ['ROLE_USER'], '2222');
-        $this->kitaC = $this->makeUser('kita-c', 'kita-c-secret', ['ROLE_USER']);
+        $this->admin = $this->makeUser('admin', ['ROLE_ADMIN']);
+        $this->kitaA = $this->makeUser('kita-a', ['ROLE_USER'], '1111');
+        $this->kitaB = $this->makeUser('kita-b', ['ROLE_USER'], '2222');
+        $this->kitaC = $this->makeUser('kita-c');
 
         // Admin allows kita-a to publish to kita-b
         $this->kitaA->addPublishTarget($this->kitaB);
         $this->em->flush();
     }
 
-    private function makeUser(string $username, string $plainPassword, array $roles, ?string $pin = null): User
-    {
-        $user = new User();
-        $user->setUsername($username);
-        $user->setRoles($roles);
-        $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
-        if (null !== $pin) {
-            $user->setDevicePin($pin);
-        }
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    private function createArticle(User $creator, string $title, array $audienceIds = [], bool $audienceAll = false): Content
-    {
-        // Kernel requests detach entities; always re-load the creator.
-        $creator = $this->em->find(User::class, $creator->getId());
-        self::assertNotNull($creator);
-
-        $content = new Content();
-        $content->setType(ContentType::ARTICLE);
-        $content->setTitle($title);
-        $content->setContent('Body of ' . $title);
-        $content->setImageUrl('/uploads/test.jpg');
-        $content->setCreator($creator);
-        $this->em->persist($content);
-        $this->em->flush();
-
-        $this->audience->syncContentAudience($content, $audienceIds, $audienceAll);
-        $this->em->flush();
-
-        return $content;
-    }
-
     private function refreshEm(): void
     {
         $this->em = static::getContainer()->get('doctrine')->getManager();
         $this->audience = static::getContainer()->get(AudienceSynchronizer::class);
-    }
-
-    private function sliderItemFor(Content $content, User $consumer): ?SliderItem
-    {
-        return $this->em->getRepository(SliderItem::class)->findOneBy([
-            'content' => $content,
-            'consumer' => $consumer,
-        ]);
     }
 
     private function submitNewKitaForm(string $username): void
@@ -400,7 +336,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testAdminCanDeleteSelectedKitasAtOnce(): void
     {
-        $content = $this->createArticle($this->kitaC, 'Verschwindet mit der Kita');
+        $content = $this->publishArticle($this->kitaC, 'Verschwindet mit der Kita');
         $this->client->loginUser($this->admin);
         $crawler = $this->client->request('GET', '/management/admin');
 
@@ -457,7 +393,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testAdminCanDeleteKitaAndContentDisappears(): void
     {
-        $content = $this->createArticle($this->kitaC, 'Wird gelöscht', [], false);
+        $content = $this->publishArticle($this->kitaC, 'Wird gelöscht', [], false);
         $itemId = $this->sliderItemFor($content, $this->kitaC)?->getId();
         self::assertNotNull($itemId);
 
@@ -558,7 +494,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $this->admin->setPublishToAll(true);
         $this->em->flush();
 
-        $content = $this->createArticle($this->admin, 'Zentral', [], true);
+        $content = $this->publishArticle($this->admin, 'Zentral', [], true);
 
         self::assertNotNull($this->sliderItemFor($content, $this->kitaA));
         self::assertNotNull($this->sliderItemFor($content, $this->kitaB));
@@ -569,7 +505,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testRemovingPublishTargetRetractsExistingContent(): void
     {
-        $content = $this->createArticle($this->kitaA, 'An B', [$this->kitaB->getId()], false);
+        $content = $this->publishArticle($this->kitaA, 'An B', [$this->kitaB->getId()], false);
         self::assertNotNull($this->sliderItemFor($content, $this->kitaB));
 
         $oldAllowed = $this->audience->resolveAllowedTargetIds($this->kitaA);
@@ -585,7 +521,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testOnlyCreatorOrAdminCanEditOrDeleteContent(): void
     {
-        $content = $this->createArticle($this->kitaA, 'Privat', [], false);
+        $content = $this->publishArticle($this->kitaA, 'Privat', [], false);
 
         $this->client->loginUser($this->kitaB);
         $this->client->request('GET', '/management/user/edit-content/' . $content->getId());
@@ -605,11 +541,28 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     // --- Slider ------------------------------------------------------------
 
+    public function testDeletingSelectedContentsReturnsTheAdminToTheAdminDashboard(): void
+    {
+        $article = $this->publishArticle($this->admin, 'Zentral');
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $token = $crawler->filter('#bulkDeleteForm input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/management/content/bulk-delete', [
+            '_token' => $token,
+            'ids' => [$article->getId()],
+        ]);
+
+        self::assertResponseRedirects('/management/admin');
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(Content::class)->find($article->getId()));
+    }
+
     public function testKitaCanReorderOwnSlides(): void
     {
-        $first = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 1'), $this->kitaA);
-        $second = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 2'), $this->kitaA);
-        $third = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 3'), $this->kitaA);
+        $first = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 1'), $this->kitaA);
+        $second = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 2'), $this->kitaA);
+        $third = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 3'), $this->kitaA);
 
         $this->client->loginUser($this->kitaA);
         $this->arrangeSlider([$third->getId(), $first->getId(), $second->getId()]);
@@ -620,9 +573,9 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testArrangingTheSliderGivesEverySlideItsOwnOrderNumber(): void
     {
-        $first = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 1'), $this->kitaA);
-        $second = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 2'), $this->kitaA);
-        $unmentioned = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 3'), $this->kitaA);
+        $first = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 1'), $this->kitaA);
+        $second = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 2'), $this->kitaA);
+        $unmentioned = $this->sliderItemFor($this->publishArticle($this->kitaA, 'Slide 3'), $this->kitaA);
         foreach ([$first, $second, $unmentioned] as $item) {
             $item->setDisplayOrder(5);
         }
@@ -642,9 +595,9 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testArrangingIgnoresSlidesOfOtherKitas(): void
     {
-        $foreignFirst = $this->sliderItemFor($this->createArticle($this->kitaB, 'Fremd 1'), $this->kitaB);
-        $foreignSecond = $this->sliderItemFor($this->createArticle($this->kitaB, 'Fremd 2'), $this->kitaB);
-        $this->createArticle($this->kitaA, 'Eigener Slide');
+        $foreignFirst = $this->sliderItemFor($this->publishArticle($this->kitaB, 'Fremd 1'), $this->kitaB);
+        $foreignSecond = $this->sliderItemFor($this->publishArticle($this->kitaB, 'Fremd 2'), $this->kitaB);
+        $this->publishArticle($this->kitaA, 'Eigener Slide');
 
         $this->client->loginUser($this->kitaA);
         $this->arrangeSlider([$foreignSecond->getId(), $foreignFirst->getId()]);
@@ -688,7 +641,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testDisablingSlideOnlyAffectsOwnSlider(): void
     {
-        $content = $this->createArticle($this->kitaA, 'Geteilt', [$this->kitaB->getId()], false);
+        $content = $this->publishArticle($this->kitaA, 'Geteilt', [$this->kitaB->getId()], false);
         $itemA = $this->sliderItemFor($content, $this->kitaA);
         $itemB = $this->sliderItemFor($content, $this->kitaB);
         self::assertTrue($itemA->isEnabled());
@@ -708,7 +661,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testAssignedForeignContentCannotBeToggled(): void
     {
-        $content = $this->createArticle($this->kitaA, 'Von A', [$this->kitaB->getId()], false);
+        $content = $this->publishArticle($this->kitaA, 'Von A', [$this->kitaB->getId()], false);
         $itemB = $this->sliderItemFor($content, $this->kitaB);
         self::assertNotNull($itemB);
 
@@ -745,7 +698,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testKitaCannotManageOtherKitasSlides(): void
     {
-        $content = $this->createArticle($this->kitaB, 'Fremd', [], false);
+        $content = $this->publishArticle($this->kitaB, 'Fremd', [], false);
         $itemB = $this->sliderItemFor($content, $this->kitaB);
 
         $this->client->loginUser($this->kitaA);
@@ -858,6 +811,33 @@ final class AuthorizationFlowTest extends AppWebTestCase
         self::assertTrue($body['unlinked'] ?? false);
     }
 
+    /**
+     * tv.js marks its poll as a script request, and it ignores every answer
+     * that is not 200: the marker must never turn the poll into anything else.
+     */
+    public function testPollMarkedAsScriptRequestGetsItsSlidesWithStatus200(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1', [], [], [
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+            'HTTP_X_DISPLAY_PIN' => '1111',
+        ]);
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(['signature', 'duration', 'html'], array_keys($body));
+    }
+
+    public function testPollMarkedAsScriptRequestIsUnlinkedWithStatus200(): void
+    {
+        $this->client->request('GET', '/slider/kita-a/content?lazy=1', [], [], [
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+            'HTTP_X_DISPLAY_PIN' => '9999',
+        ]);
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(['unlinked' => true], json_decode($this->client->getResponse()->getContent(), true));
+    }
+
     public function testNewContentAppearsOnTvWithoutReload(): void
     {
         $crawler = $this->client->request('GET', '/slider/display');
@@ -869,7 +849,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $before = json_decode($this->client->getResponse()->getContent(), true);
         self::assertArrayHasKey('signature', $before);
 
-        $this->createArticle($this->kitaA, 'Frisch auf dem TV', [], false);
+        $this->publishArticle($this->kitaA, 'Frisch auf dem TV', [], false);
 
         $this->client->request('GET', '/slider/kita-a/content');
         $after = json_decode($this->client->getResponse()->getContent(), true);
@@ -881,7 +861,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
     public function testSliderPageLoadsOnlyTheFirstSlideImageUpFront(): void
     {
         foreach (['Eins', 'Zwei', 'Drei'] as $title) {
-            $this->createArticle($this->kitaA, $title);
+            $this->publishArticle($this->kitaA, $title);
         }
 
         $crawler = $this->client->request('GET', '/slider/kita-a');
@@ -895,7 +875,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
     public function testPollServesWaitingImagesOnlyToTheScriptThatAsksForThem(): void
     {
         foreach (['Eins', 'Zwei', 'Drei'] as $title) {
-            $this->createArticle($this->kitaA, $title);
+            $this->publishArticle($this->kitaA, $title);
         }
 
         $this->client->request('GET', '/slider/kita-a/content');
@@ -911,8 +891,8 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testSliderPageAndItsPollAgreeOnTheContentSignature(): void
     {
-        $this->createArticle($this->kitaA, 'Eins');
-        $this->createArticle($this->kitaA, 'Zwei');
+        $this->publishArticle($this->kitaA, 'Eins');
+        $this->publishArticle($this->kitaA, 'Zwei');
 
         $crawler = $this->client->request('GET', '/slider/kita-a');
         $signatureInPage = $crawler->filter('#tv-slider')->attr('data-content-signature');
@@ -923,7 +903,7 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     public function testRenamedKitaKeepsFeedingItsLinkedTv(): void
     {
-        $this->createArticle($this->kitaA, 'Vor der Umbenennung');
+        $this->publishArticle($this->kitaA, 'Vor der Umbenennung');
         $this->kitaA->setUsername('Kita Regenbogen');
         $this->em->flush();
 
@@ -951,6 +931,39 @@ final class AuthorizationFlowTest extends AppWebTestCase
         $this->client->request('GET', '/slider/gibt-es-nicht/content');
 
         self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testUnknownSliderAddressIsNotFound(): void
+    {
+        $this->client->request('GET', '/slider/gibt-es-nicht');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testUnknownSliderAddressIsNotFoundForALoggedInKitaEither(): void
+    {
+        $this->client->loginUser($this->kitaA);
+
+        $this->client->request('GET', '/slider/gibt-es-nicht');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testSliderAddressWithoutANameShowsTheOwnSlider(): void
+    {
+        $this->client->loginUser($this->kitaA);
+
+        $crawler = $this->client->request('GET', '/slider');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('kita-a', $crawler->filter('.tv-watermark')->text());
+    }
+
+    public function testSliderAddressWithoutANameNeedsALogin(): void
+    {
+        $this->client->request('GET', '/slider');
+
+        self::assertResponseRedirects('/admin');
     }
 
     public function testLoggedInPreviewIsNotBoundToAPinEnteredEarlier(): void

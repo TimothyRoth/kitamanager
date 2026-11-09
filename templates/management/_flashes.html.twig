@@ -1,3 +1,12 @@
+{# Read before the loop below, which would print every entry on its own. #}
+{% set uploadedImages = app.flashes('uploaded-image')|length %}
+{% if uploadedImages > 0 %}
+    <div class="alert alert-success" role="status">
+        {{ uploadedImages }} Bild(er) erfolgreich hochgeladen!
+        {% if not app.user.isAdmin %}Prüfen Sie die Reihenfolge in „Mein Slider“.{% endif %}
+        Änderungen erscheinen auf dem Fernseher in Kürze.
+    </div>
+{% endif %}
 {% for label, messages in app.flashes %}
     {% for message in messages %}
         <div class="alert alert-{{ label }}" role="status">{{ message }}</div>

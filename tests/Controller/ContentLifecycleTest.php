@@ -6,23 +6,22 @@ use App\Entity\Content;
 use App\Entity\SliderItem;
 use App\Entity\User;
 use App\Enum\ContentType;
-use App\Service\AudienceSynchronizer;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
+use App\Service\ImageUploader;
 use App\Tests\AppWebTestCase;
+use App\Tests\ImageFixturesTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\String\Slugger\SluggerInterface;
 
 /**
  * Content CRUD, validation, bulk delete, and TV cookie linking.
  */
 final class ContentLifecycleTest extends AppWebTestCase
 {
+    use ImageFixturesTrait;
+
     private KernelBrowser $client;
-    private EntityManagerInterface $em;
-    private AudienceSynchronizer $audience;
-    private string $tmpDir;
 
     private User $kitaA;
     private User $kitaB;
@@ -31,80 +30,21 @@ final class ContentLifecycleTest extends AppWebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $container = static::getContainer();
 
-        $this->em = $container->get('doctrine')->getManager();
-        $this->audience = $container->get(AudienceSynchronizer::class);
-        $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $meta = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool = new SchemaTool($this->em);
-        $tool->dropSchema($meta);
-        $tool->createSchema($meta);
-
-        $this->kitaA = $this->makeUser($hasher, 'kita-a', 'kita-a-secret', '1111');
-        $this->kitaB = $this->makeUser($hasher, 'kita-b', 'kita-b-secret', '2222');
+        $this->openFreshDatabase();
+        $this->kitaA = $this->makeUser('kita-a', ['ROLE_USER'], '1111');
+        $this->kitaB = $this->makeUser('kita-b', ['ROLE_USER'], '2222');
         $this->kitaA->addPublishTarget($this->kitaB);
         $this->em->flush();
 
-        $this->tmpDir = sys_get_temp_dir() . '/km_lifecycle_' . bin2hex(random_bytes(4));
-        mkdir($this->tmpDir);
+        $this->createTempDir();
     }
 
     protected function tearDown(): void
     {
-        foreach (glob($this->tmpDir . '/*') ?: [] as $file) {
-            @unlink($file);
-        }
-        @rmdir($this->tmpDir);
+        $this->removeTempDir();
 
         parent::tearDown();
-    }
-
-    private function makeUser(UserPasswordHasherInterface $hasher, string $username, string $password, ?string $pin = null): User
-    {
-        $user = new User();
-        $user->setUsername($username);
-        $user->setRoles(['ROLE_USER']);
-        $user->setPassword($hasher->hashPassword($user, $password));
-        if (null !== $pin) {
-            $user->setDevicePin($pin);
-        }
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    private function makeJpeg(string $name): string
-    {
-        $path = $this->tmpDir . '/' . $name;
-        $img = imagecreatetruecolor(120, 80);
-        $bg = imagecolorallocate($img, 40, 120, 200);
-        imagefill($img, 0, 0, $bg);
-        imagejpeg($img, $path, 90);
-
-        return $path;
-    }
-
-    private function seedArticle(User $creator, string $title, array $audienceIds = []): Content
-    {
-        $creator = $this->em->find(User::class, $creator->getId());
-        self::assertNotNull($creator);
-
-        $content = new Content();
-        $content->setType(ContentType::ARTICLE);
-        $content->setTitle($title);
-        $content->setContent('Body of ' . $title);
-        $content->setImageUrl('/uploads/test.jpg');
-        $content->setCreator($creator);
-        $this->em->persist($content);
-        $this->em->flush();
-
-        $this->audience->syncContentAudience($content, $audienceIds, false);
-        $this->em->flush();
-
-        return $content;
     }
 
     public function testCreateArticleViaFormCreatesSliderItems(): void
@@ -148,6 +88,24 @@ final class ContentLifecycleTest extends AppWebTestCase
         );
     }
 
+    public function testSavingAnArticleFromTheUploadScriptKeepsTheJumpAndTheMessage(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-article');
+        $form = $crawler->selectButton('Speichern')->form([
+            'content[title]' => 'Hallo Kita',
+            'content[content]' => 'Artikeltext',
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('article.jpg'));
+
+        $this->client->submit($form, [], ['HTTP_X-Requested-With' => 'XMLHttpRequest']);
+
+        self::assertResponseStatusCodeSame(204);
+        self::assertResponseHeaderSame('X-Redirect-To', '/management/user#mein-slider');
+        $this->client->request('GET', '/management/user');
+        self::assertSelectorTextContains('.alert-success', 'Artikel erfolgreich erstellt!');
+    }
+
     public function testCreateArticleRequiresTitleAndBody(): void
     {
         $this->client->loginUser($this->kitaA);
@@ -164,10 +122,161 @@ final class ContentLifecycleTest extends AppWebTestCase
         $form['content[imageFile]']->upload($uploadPath);
 
         $this->client->submit($form);
-        // createArticle re-renders without an explicit 422; errors must still show.
-        self::assertResponseIsSuccessful();
+        self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('body', 'Titel');
         self::assertNull($this->em->getRepository(Content::class)->findOneBy(['title' => '']));
+    }
+
+    public function testPhotoFormRejectsAFileThatIsNoImage(): void
+    {
+        $notAnImage = $this->tmpDir . '/notes.txt';
+        file_put_contents($notAnImage, 'not an image');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-image');
+        $form = $crawler->selectButton('Fotos hochladen')->form();
+        $form['content[imageFile][0]']->upload($notAnImage);
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.form-errors', 'Bitte laden Sie ein gültiges Bild hoch');
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testPhotoFormStoresEveryPhotoWithItsSliderEntries(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg')]);
+
+        self::assertResponseRedirects('/management/user#mein-slider');
+        $this->em->clear();
+        $photos = $this->em->getRepository(Content::class)->findAll();
+        self::assertCount(2, $photos);
+        foreach ($photos as $photo) {
+            self::assertSame(ContentType::IMAGE, $photo->getType());
+            self::assertCount(2, $this->em->getRepository(SliderItem::class)->findBy(['content' => $photo]));
+        }
+    }
+
+    public function testPhotoFormConfirmsHowManyPhotosWereStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg')]);
+        $this->client->followRedirect();
+
+        self::assertSelectorTextContains('.alert-success', '2 Bild(er) erfolgreich hochgeladen! Prüfen Sie die Reihenfolge in „Mein Slider“.');
+    }
+
+    public function testPhotoFormReportsAPhotoThatCannotBeStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->submitPhotoForm([$this->makeJpeg('unstorable.jpg')])
+        );
+
+        self::assertResponseRedirects('/management/user/create-image');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testPhotoFormKeepsThePhotosStoredBeforeAFailure(): void
+    {
+        $container = static::getContainer();
+        $container->set(ImageUploader::class, new class($container->getParameter('uploads_directory'), $container->get(SluggerInterface::class), new Filesystem()) extends ImageUploader {
+            private int $uploads = 0;
+
+            public function upload(UploadedFile $file, int $userId): string
+            {
+                if (2 === ++$this->uploads) {
+                    throw new \RuntimeException('The disk is full.');
+                }
+
+                return parent::upload($file, $userId);
+            }
+        });
+        $this->client->disableReboot();
+
+        $this->client->loginUser($this->kitaA);
+        $this->submitPhotoForm([$this->makeJpeg('eins.jpg'), $this->makeJpeg('zwei.jpg'), $this->makeJpeg('drei.jpg')]);
+
+        self::assertResponseRedirects('/management/user#mein-slider');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        $this->em->clear();
+        $photos = $this->em->getRepository(Content::class)->findAll();
+        self::assertCount(1, $photos);
+        self::assertCount(2, $this->em->getRepository(SliderItem::class)->findBy(['content' => $photos[0]]));
+    }
+
+    public function testArticleFormReportsAnImageThatCannotBeStored(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/create-article');
+        $form = $crawler->selectButton('Speichern')->form([
+            'content[title]' => 'Hallo Kita',
+            'content[content]' => 'Artikeltext',
+        ]);
+        $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
+
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->client->submit($form));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        self::assertSame(0, $this->em->getRepository(Content::class)->count([]));
+    }
+
+    public function testEditFormReportsAnImageThatCannotBeStored(): void
+    {
+        $article = $this->publishArticle($this->kitaA, 'Bleibt');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $form = $crawler->selectButton('Änderungen speichern')->form(['content[title]' => 'Neu']);
+        $form['content[imageFile]']->upload($this->makeJpeg('unstorable.jpg'));
+
+        $logged = $this->whileTheUploadFolderIsBlocked($this->kitaA, fn () => $this->client->submit($form));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.alert-danger', self::IMAGE_NOT_STORED);
+        self::assertStringContainsString('Storing an uploaded image failed', $logged);
+        $this->em->clear();
+        $unchanged = $this->em->getRepository(Content::class)->find($article->getId());
+        self::assertSame('Bleibt', $unchanged->getTitle());
+        self::assertSame('/uploads/test.jpg', $unchanged->getImageUrl());
+    }
+
+    private const IMAGE_NOT_STORED = 'Beim Speichern des Bildes gab es einen unerwarteten Fehler.';
+
+    /**
+     * @param list<string> $photoPaths
+     */
+    private function submitPhotoForm(array $photoPaths): void
+    {
+        $crawler = $this->client->request('GET', '/management/user/create-image');
+        $form = $crawler->selectButton('Fotos hochladen')->form();
+        $values = $form->getPhpValues();
+        $files = ['content' => ['imageFile' => []]];
+        foreach ($photoPaths as $photoPath) {
+            $files['content']['imageFile'][] = new UploadedFile($photoPath, basename($photoPath), 'image/jpeg', null, true);
+        }
+
+        $this->client->request('POST', $form->getUri(), $values, $files);
+    }
+
+    public function testEditingAnArticleRequiresATitle(): void
+    {
+        $article = $this->publishArticle($this->kitaA, 'Bleibt');
+
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user/edit-content/' . $article->getId());
+        $form = $crawler->selectButton('Änderungen speichern')->form(['content[title]' => '']);
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        $this->em->clear();
+        self::assertSame('Bleibt', $this->em->getRepository(Content::class)->find($article->getId())->getTitle());
     }
 
     private const UNSAFE_ARTICLE_TEXT = '<h2>Sommerfest</h2><p>Am <strong>Freitag</strong> ab <em>15 Uhr</em></p>'
@@ -200,7 +309,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testUnsafeArticleTextAlreadyStoredIsCleanedOnTheSlider(): void
     {
-        $this->seedArticle($this->kitaA, 'Altbestand')->setContent(self::UNSAFE_ARTICLE_TEXT);
+        $this->publishArticle($this->kitaA, 'Altbestand')->setContent(self::UNSAFE_ARTICLE_TEXT);
         $this->em->flush();
 
         $this->client->request('GET', '/slider/kita-a');
@@ -216,7 +325,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testUnsafeArticleTextAlreadyStoredIsCleanedInTheEditor(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Altbestand');
+        $article = $this->publishArticle($this->kitaA, 'Altbestand');
         $article->setContent(self::UNSAFE_ARTICLE_TEXT);
         $this->em->flush();
 
@@ -239,7 +348,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testEditingAnArticleReplacesItsTextAndImage(): void
     {
-        $article = $this->seedArticle($this->kitaA, 'Alter Titel');
+        $article = $this->publishArticle($this->kitaA, 'Alter Titel');
         $uploads = static::getContainer()->getParameter('uploads_directory');
         $oldImage = $uploads . '/' . $this->kitaA->getId() . '/alt.jpg';
         @mkdir(dirname($oldImage), 0777, true);
@@ -268,7 +377,7 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testDeleteContentRemovesRowAndSliderItems(): void
     {
-        $content = $this->seedArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);
+        $content = $this->publishArticle($this->kitaA, 'Zum Löschen', [$this->kitaB->getId()]);
         $contentId = $content->getId();
         $itemIds = array_map(
             static fn (SliderItem $i) => $i->getId(),
@@ -291,8 +400,8 @@ final class ContentLifecycleTest extends AppWebTestCase
 
     public function testBulkDeleteSkipsUnauthorizedIds(): void
     {
-        $own = $this->seedArticle($this->kitaA, 'Eigen');
-        $foreign = $this->seedArticle($this->kitaB, 'Fremd');
+        $own = $this->publishArticle($this->kitaA, 'Eigen');
+        $foreign = $this->publishArticle($this->kitaB, 'Fremd');
 
         $this->client->loginUser($this->kitaA);
         $crawler = $this->client->request('GET', '/management/user');
@@ -301,7 +410,6 @@ final class ContentLifecycleTest extends AppWebTestCase
 
         $this->client->request('POST', '/management/content/bulk-delete', [
             '_token' => $token,
-            '_redirect' => 'app_management_user',
             'ids' => [$own->getId(), $foreign->getId()],
         ]);
         self::assertResponseRedirects('/management/user');
@@ -321,6 +429,23 @@ final class ContentLifecycleTest extends AppWebTestCase
         $this->client->submit($form);
 
         self::assertResponseStatusCodeSame(422);
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(User::class)->find($this->kitaA->getId());
+        self::assertSame(10, $reloaded->getDurationBetweenSlides());
+    }
+
+    public function testEmptyDurationIsRejected(): void
+    {
+        $this->client->loginUser($this->kitaA);
+        $crawler = $this->client->request('GET', '/management/user');
+        $form = $crawler->selectButton('Dauer speichern')->form([
+            'user_duration[durationBetweenSlides]' => '',
+        ]);
+        $crawler = $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('Die Dauer muss zwischen 1 und 60 Sekunden liegen.', $crawler->filter('.form-errors')->text());
 
         $this->em->clear();
         $reloaded = $this->em->getRepository(User::class)->find($this->kitaA->getId());
