@@ -605,6 +605,23 @@ final class AuthorizationFlowTest extends AppWebTestCase
 
     // --- Slider ------------------------------------------------------------
 
+    public function testDeletingSelectedContentsReturnsTheAdminToTheAdminDashboard(): void
+    {
+        $article = $this->createArticle($this->admin, 'Zentral');
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/management/admin');
+        $token = $crawler->filter('#bulkDeleteForm input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/management/content/bulk-delete', [
+            '_token' => $token,
+            'ids' => [$article->getId()],
+        ]);
+
+        self::assertResponseRedirects('/management/admin');
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(Content::class)->find($article->getId()));
+    }
+
     public function testKitaCanReorderOwnSlides(): void
     {
         $first = $this->sliderItemFor($this->createArticle($this->kitaA, 'Slide 1'), $this->kitaA);

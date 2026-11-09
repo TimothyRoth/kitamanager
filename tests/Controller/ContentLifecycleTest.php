@@ -330,7 +330,6 @@ final class ContentLifecycleTest extends AppWebTestCase
 
         $this->client->request('POST', '/management/content/bulk-delete', [
             '_token' => $token,
-            '_redirect' => 'app_management_user',
             'ids' => [$own->getId(), $foreign->getId()],
         ]);
         self::assertResponseRedirects('/management/user');

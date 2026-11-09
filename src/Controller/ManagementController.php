@@ -598,15 +598,10 @@ final class ManagementController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function bulkDeleteContent(Request $request, EntityManagerInterface $entityManager, ContentRepository $contentRepository): Response
     {
-        $redirect = $request->request->get('_redirect');
-        $redirectRoute = in_array($redirect, ['app_management_user', 'app_management_admin'], true)
-            ? $redirect
-            : 'app_management_user';
-
         if (!$this->isCsrfTokenValid('bulk-delete', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Ungültiger CSRF-Token.');
 
-            return $this->redirectToRoute($redirectRoute);
+            return $this->redirectToRoute($this->dashboard->routeOfCurrentUser());
         }
 
         $ids = $request->request->all('ids');
@@ -629,7 +624,7 @@ final class ManagementController extends AbstractController
             $this->addFlash('danger', 'Es wurden keine Inhalte gelöscht.');
         }
 
-        return $this->redirectToRoute($redirectRoute);
+        return $this->redirectToRoute($this->dashboard->routeOfCurrentUser());
     }
 
     #[Route('/slider-item/reorder', name: 'app_management_slider_reorder', methods: ['POST'])]

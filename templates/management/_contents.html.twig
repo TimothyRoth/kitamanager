@@ -1,5 +1,5 @@
 {# Cards of the contents a user created, with bulk delete.
-   Expects: contents, redirect_route, empty_text, creator_has_slider #}
+   Expects: contents, empty_text, creator_has_slider #}
 {% import '_icons.html.twig' as icons %}
 
 {% if contents is empty %}
@@ -13,7 +13,6 @@
         <form id="bulkDeleteForm" method="post" action="{{ path('app_management_bulk_delete_content') }}"
               data-confirm="Ausgewählte Inhalte wirklich löschen? Sie werden bei allen Empfängern entfernt.">
             <input type="hidden" name="_token" value="{{ csrf_token('bulk-delete') }}">
-            <input type="hidden" name="_redirect" value="{{ redirect_route }}">
             <button type="submit" class="btn btn-danger" data-bulk-submit disabled>{{ icons.icon('trash') }} Ausgewählte löschen</button>
         </form>
     </div>
