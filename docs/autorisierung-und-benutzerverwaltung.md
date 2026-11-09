@@ -170,6 +170,7 @@ classDiagram
 - [ ] Admin kann Passwort einer Kita ändern.
 - [ ] Admin kann das eigene Passwort im Dashboard ändern (aktuelles Passwort erforderlich).
 - [ ] Admin kann einer Kita eine 4-stellige Geräte-PIN zuweisen; PIN muss eindeutig sein.
+- [ ] Admin kann einer Kita beim Bearbeiten mit "Zufällige PIN vergeben" eine zufällige, systemweit eindeutige PIN geben; sie wird sofort gespeichert und angezeigt (Rückfrage, wenn die Kita schon eine PIN hat).
 - [ ] Admin kann in der Kita-Liste mehrere Kitas ankreuzen und ihnen mit "Neue PINs vergeben" zufällige, systemweit eindeutige PINs geben (nach Rückfrage). Ausgefilterte Kitas sind nie Teil der Auswahl.
 - [ ] Admin kann einer Kita "Zugewiesene Kitas" geben oder "Allen Kitas zuweisen" aktivieren.
 - [ ] Admin kann Kita löschen; deren Inhalte, Slider-Einträge und Zuweisungen (als Ersteller wie als Ziel) verschwinden.

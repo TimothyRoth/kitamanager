@@ -59,7 +59,12 @@
 
             {{ form_start(devicePinForm) }}
             {{ form_row(devicePinForm.devicePin) }}
-            <button type="submit" class="btn btn-primary">PIN speichern</button>
+            <div class="btn-row">
+                <button type="submit" class="btn btn-primary">PIN speichern</button>
+                <button type="submit" class="btn btn-secondary"
+                        formaction="{{ path('app_management_random_device_pin', {'id': user.id}) }}" name="_token" value="{{ csrf_token('random-device-pin' ~ user.id) }}"
+                        {% if user.devicePin %}data-confirm="Dieser Kita eine neue, zufällige Fernseher-PIN geben? Bereits verbundene Fernseher verlieren ihre Zuordnung und müssen mit der neuen PIN verbunden werden."{% endif %}>{{ icons.icon('tv') }} Zufällige PIN vergeben</button>
+            </div>
             {{ form_end(devicePinForm) }}
         </section>
     </main>
