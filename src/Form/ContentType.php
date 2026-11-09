@@ -108,7 +108,7 @@ class ContentType extends AbstractType
                 'expanded' => true,
                 'required' => false,
                 'label' => 'Sichtbar für ausgewählte Kitas',
-                'help' => 'Suche und wähle die Kitas, die diesen Inhalt im Slider sehen sollen.',
+                'help' => 'Suchen und wählen Sie die Kitas, die diesen Inhalt im Slider sehen sollen.',
                 'choice_label' => 'username',
                 'choices' => $options['audience_choices'],
                 'data' => $options['audience_selected'],

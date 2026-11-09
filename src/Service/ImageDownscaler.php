@@ -99,34 +99,28 @@ class ImageDownscaler
         // Keep transparent PNGs as PNG; opaque PNGs become JPEG (much smaller).
         $keepPngAlpha = 'image/png' === $mime && $this->pngHasAlphaChannel($path);
 
-        try {
-            $edge = min(self::START_EDGE, max(imagesx($source), imagesy($source)));
+        $edge = min(self::START_EDGE, max(imagesx($source), imagesy($source)));
 
-            while (true) {
-                $scaled = $this->scaleToEdge($source, $edge, $keepPngAlpha);
-                $encoded = $this->encode($scaled, $keepPngAlpha);
+        while (true) {
+            $scaled = $this->scaleToEdge($source, $edge, $keepPngAlpha);
+            $encoded = $this->encode($scaled, $keepPngAlpha);
 
-                if (strlen($encoded) <= self::MAX_BYTES) {
-                    if (false === @file_put_contents($path, $encoded)) {
-                        throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
-                    }
-                    clearstatcache(true, $path);
-
-                    return;
+            if (strlen($encoded) <= self::MAX_BYTES) {
+                if (false === @file_put_contents($path, $encoded)) {
+                    throw new ImageDownscaleException('Das verkleinerte Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
                 }
+                clearstatcache(true, $path);
 
-                if ($edge <= self::MIN_EDGE) {
-                    // Practically unreachable for JPEG; only extreme
-                    // transparency-heavy PNGs can end up here.
-                    throw new ImageDownscaleException('Das Bild konnte nicht ausreichend verkleinert werden. Bitte verkleinern Sie es selbst.');
-                }
-
-                $edge = max(self::MIN_EDGE, (int) round($edge * 0.75));
+                return;
             }
-        } finally {
-            // GdImage objects are released by the garbage collector (imagedestroy
-            // is a deprecated no-op since PHP 8.0 / 8.5).
-            unset($source);
+
+            if ($edge <= self::MIN_EDGE) {
+                // Practically unreachable for JPEG; only extreme
+                // transparency-heavy PNGs can end up here.
+                throw new ImageDownscaleException('Das Bild konnte nicht ausreichend verkleinert werden. Bitte verkleinern Sie es selbst.');
+            }
+
+            $edge = max(self::MIN_EDGE, (int) round($edge * 0.75));
         }
     }
 

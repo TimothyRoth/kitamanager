@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Inline management actions (reorder / toggle) submit a real form and reload
+    // Inline management actions (slide switch, settings) submit a real form and reload
     // the page, which otherwise jumps back to the top. Remember the affected row
     // and bring it back into view after the reload so the list "stays put".
     const initScrollPreservation = () => {
