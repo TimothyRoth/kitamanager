@@ -838,15 +838,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const responsePath = new URL(xhr.responseURL).pathname;
-            const formPath = new URL(form.action, window.location.origin).pathname;
-
-            if (responsePath !== formPath) {
-                window.location.href = xhr.responseURL;
-                return;
-            }
-
-            // Validation errors or flash on the same page — replace document.
+            // The request has already followed any redirect and fetched the page
+            // behind it, including messages that are shown only once. Loading
+            // that page a second time would lose them, so show this answer.
+            history.replaceState(null, '', xhr.responseURL);
             document.open();
             document.write(xhr.responseText);
             document.close();
